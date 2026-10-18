@@ -2,5 +2,10 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "sortImports": {},
   "sortPackageJson": true,
-  "ignorePatterns": ["pnpm-lock.yaml", "**/routeTree.gen.ts"]
+  "ignorePatterns": [
+    "pnpm-lock.yaml",
+    "**/routeTree.gen.ts",
+    "**/graphql-env.d.ts",
+    "**/railway-schema.graphql"
+  ]
 }
