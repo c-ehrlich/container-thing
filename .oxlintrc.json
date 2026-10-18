@@ -14,5 +14,30 @@
   "env": {
     "builtin": true
   },
-  "rules": {}
+  "rules": {
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    "react/react-in-jsx-scope": "off"
+  },
+  "overrides": [
+    {
+      "files": ["packages/ui/src/primitives/**", "packages/ui/src/hooks/**"],
+      "rules": {
+        "typescript/consistent-return": "off",
+        "eslint/no-shadow": "off",
+        "eslint/no-underscore-dangle": "off",
+        "jsx-a11y/click-events-have-key-events": "off",
+        "jsx-a11y/label-has-associated-control": "off",
+        "jsx-a11y/no-noninteractive-element-interactions": "off",
+        "jsx-a11y/prefer-tag-over-role": "off",
+        "react/jsx-no-constructed-context-values": "off",
+        "react/no-array-index-key": "off",
+        "react/no-object-type-as-default-prop": "off",
+        "react/no-unstable-nested-components": "off",
+        "react/set-state-in-effect": "off",
+        "typescript/no-unnecessary-type-assertion": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/restrict-template-expressions": "off"
+      }
+    }
+  ]
 }

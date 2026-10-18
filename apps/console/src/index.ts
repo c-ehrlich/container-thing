@@ -1,3 +1,3 @@
-import { cn } from "@repo/ui";
+import { cn } from "@repo/ui/lib/utils";
 
 console.log(cn("hello", "from", "console"));

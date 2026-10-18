@@ -4,6 +4,7 @@
     "target": "es2023",
     "lib": ["es2023", "dom", "dom.iterable"],
     "module": "preserve",
+    "jsx": "react-jsx",
     "moduleDetection": "force",
     "resolveJsonModule": true,
     "skipLibCheck": true,

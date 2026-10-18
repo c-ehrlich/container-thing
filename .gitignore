@@ -11,3 +11,6 @@ dist
 !.env.example
 
 .DS_Store
+
+storybook-static
+*storybook.log
