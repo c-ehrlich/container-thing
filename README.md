@@ -3,7 +3,7 @@
 pnpm + Turborepo monorepo.
 
 ```
-apps/console   TanStack Start app (soon)
+apps/console   TanStack Start app
 packages/ui    UI library (shadcn/ui on Base UI), consumed as TS source (no build step)
 ```
 
