@@ -1,8 +1,4 @@
-import {
-  deleteCookie,
-  getCookie,
-  setCookie,
-} from "@tanstack/react-start/server";
+import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
 import { EncryptJWT, jwtDecrypt } from "jose";
 import { z } from "zod";
 
@@ -46,7 +42,20 @@ async function encryptionKey(): Promise<Uint8Array> {
  * Returns null if there is no session or if the session is invalid.
  */
 export async function readSession(): Promise<Session | null> {
-  const token = getCookie(SESSION_COOKIE);
+  return decryptSession(getCookie(SESSION_COOKIE));
+}
+
+/**
+ * Same as `readSession`, for code that runs outside TanStack Start's request context
+ * (the WebSocket upgrade in `live-socket.ts`).
+ */
+export async function readSessionFromRequest(request: Request): Promise<Session | null> {
+  const cookies = request.headers.get("cookie")?.split(/;\s*/) ?? [];
+  const cookie = cookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`));
+  return decryptSession(cookie && decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1)));
+}
+
+async function decryptSession(token: string | undefined): Promise<Session | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtDecrypt(token, await encryptionKey());

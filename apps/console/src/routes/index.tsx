@@ -1,7 +1,7 @@
 import { Button, buttonVariants } from "@repo/ui/primitives/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/primitives/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@repo/ui/primitives/empty";
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 
 import { graphql } from "../graphql/graphql";
@@ -90,7 +90,15 @@ function Home() {
               <CardContent>
                 <ul className="grid gap-1 text-sm">
                   {workspace.projects.map((project) => (
-                    <li key={project.id}>{project.name}</li>
+                    <li key={project.id}>
+                      <Link
+                        to="/projects/$projectId"
+                        params={{ projectId: project.id }}
+                        className="hover:underline"
+                      >
+                        {project.name}
+                      </Link>
+                    </li>
                   ))}
                 </ul>
               </CardContent>

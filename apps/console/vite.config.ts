@@ -12,5 +12,13 @@ const rootEnvFile = new URL("../../.env", import.meta.url);
 if (existsSync(rootEnvFile)) process.loadEnvFile(rootEnvFile);
 
 export default defineConfig({
-  plugins: [tailwindcss(), tanstackStart(), react(), nitro()],
+  plugins: [
+    tailwindcss(),
+    tanstackStart(),
+    react(),
+    nitro({
+      features: { websocket: true },
+      handlers: [{ route: "/api/live", handler: "./src/server/live-socket.ts" }],
+    }),
+  ],
 });
