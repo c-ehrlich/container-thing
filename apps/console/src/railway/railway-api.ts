@@ -9,6 +9,8 @@ const GraphQLResponse = z.object({
   errors: z.array(z.object({ message: z.string() })).optional(),
 });
 
+export type RailwayClient = ReturnType<typeof createRailwayClient>;
+
 /**
  * A typed request function for Railway's public GraphQL API, authenticated as one user, with error handling.
  */
@@ -31,8 +33,7 @@ export function createRailwayClient(accessToken: string) {
     const json: unknown = await response.json().catch(() => null);
     const { data, errors = [] } = GraphQLResponse.safeParse(json).data ?? {};
     if (!response.ok || errors.length > 0 || data == null) {
-      const reason =
-        errors.map((e) => e.message).join("; ") || `HTTP ${response.status}`;
+      const reason = errors.map((e) => e.message).join("; ") || `HTTP ${response.status}`;
       throw new Error(`Railway API: ${reason}`);
     }
 

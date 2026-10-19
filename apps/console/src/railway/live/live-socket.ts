@@ -4,7 +4,7 @@ import type { Client } from "graphql-ws";
 import { defineWebSocketHandler } from "nitro";
 import { z } from "zod";
 
-import { readSessionFromRequest } from "./session";
+import { readSessionFromRequest } from "../../server/session";
 
 /**
  * WebSocket relay between the browser and Railway, speaking `graphql-transport-ws` on both sides.

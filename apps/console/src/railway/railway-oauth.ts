@@ -12,9 +12,9 @@ import {
 import type { OAuth2Tokens } from "arctic";
 
 import { AUTHORIZATION_ENDPOINT, TOKEN_ENDPOINT } from "./consts";
-import { env } from "./env";
-import type { Session } from "./session";
-import { cookieDefaults, readSession, writeSession } from "./session";
+import { env } from "../server/env";
+import type { Session } from "../server/session";
+import { cookieDefaults, readSession, writeSession } from "../server/session";
 
 /**
  * `offline_access` returns a refresh token.

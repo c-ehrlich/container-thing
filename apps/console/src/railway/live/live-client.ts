@@ -5,7 +5,7 @@ import { createClient } from "graphql-ws";
 import type { Client } from "graphql-ws";
 import { useSyncExternalStore } from "react";
 
-import { getFreshSession } from "../server/railway-oauth";
+import { getFreshSession } from "../railway-oauth";
 
 /**
  * Refreshes the session cookie if the access token is about to expire, so the WebSocket upgrade
