@@ -1,0 +1,2 @@
+- before starting dev and/or storybook servers, check if we already have ones running on 3000 and 6006
+- use ui components from packages/ui where possible, we have all of shadcn in there
