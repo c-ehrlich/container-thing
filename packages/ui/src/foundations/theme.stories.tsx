@@ -20,6 +20,7 @@ import { Progress, ProgressLabel, ProgressValue } from "../primitives/progress/p
 import { RadioGroup, RadioGroupItem } from "../primitives/radio-group/radio-group";
 import { Slider } from "../primitives/slider/slider";
 import { Spinner } from "../primitives/spinner/spinner";
+import { StatusDot } from "../primitives/status-dot/status-dot";
 import { Switch } from "../primitives/switch/switch";
 import { Tabs, TabsList, TabsTrigger } from "../primitives/tabs/tabs";
 import { Toggle } from "../primitives/toggle/toggle";
@@ -42,6 +43,8 @@ const pairs = [
   ["muted", "muted-foreground"],
   ["accent", "accent-foreground"],
   ["destructive", "primary-foreground"],
+  ["success", "success-foreground"],
+  ["warning", "warning-foreground"],
   ["sidebar", "sidebar-foreground"],
   ["sidebar-primary", "sidebar-primary-foreground"],
   ["sidebar-accent", "sidebar-accent-foreground"],
@@ -114,13 +117,18 @@ function Specimen() {
         <Button variant="link">Link</Button>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Badge>Running</Badge>
-        <Badge variant="secondary">
+        <Badge variant="success">Running</Badge>
+        <Badge variant="warning">
           <Spinner />
-          Building
+          Deploying
         </Badge>
-        <Badge variant="outline">Sleeping</Badge>
-        <Badge variant="destructive">Failed</Badge>
+        <Badge variant="destructive">Stopped</Badge>
+        <Badge>Default</Badge>
+        <Badge variant="secondary">Secondary</Badge>
+        <Badge variant="outline">
+          <StatusDot tone="success" pulse />
+          Live
+        </Badge>
         <Badge variant="ghost">Ghost</Badge>
         <Badge variant="link">Link</Badge>
       </div>

@@ -28,6 +28,10 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -68,6 +72,11 @@
   --accent: oklch(0.955 0.05 322);
   --accent-foreground: oklch(0.38 0.15 322);
   --destructive: oklch(0.577 0.245 27.325);
+  /* Status colors: green for healthy, yellow for in progress. Red is --destructive. */
+  --success: oklch(0.6 0.16 150);
+  --success-foreground: oklch(0.99 0.01 150);
+  --warning: oklch(0.66 0.17 65);
+  --warning-foreground: oklch(0.99 0.01 65);
   --border: oklch(0.92 0.008 320);
   --input: oklch(0.92 0.008 320);
   --ring: oklch(0.55 0.22 322);
@@ -103,6 +112,10 @@
   --accent: oklch(0.25 0.06 322);
   --accent-foreground: oklch(0.93 0.04 322);
   --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.76 0.17 152);
+  --success-foreground: oklch(0.2 0.04 152);
+  --warning: oklch(0.83 0.16 85);
+  --warning-foreground: oklch(0.2 0.04 85);
   --border: oklch(0.28 0.012 320);
   --input: oklch(0.32 0.012 320);
   --ring: oklch(0.7 0.2 322);

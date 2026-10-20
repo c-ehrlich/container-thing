@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { BadgeCheckIcon, CircleAlertIcon, MoonIcon } from "lucide-react";
+import { BadgeCheckIcon, CircleAlertIcon } from "lucide-react";
 
 import { Spinner } from "../spinner/spinner";
 import { Badge } from "./badge";
@@ -30,6 +30,12 @@ export const Variants: Story = {
       <Badge {...args} variant="destructive">
         Destructive
       </Badge>
+      <Badge {...args} variant="success">
+        Success
+      </Badge>
+      <Badge {...args} variant="warning">
+        Warning
+      </Badge>
       <Badge {...args} variant="link">
         Link
       </Badge>
@@ -37,7 +43,16 @@ export const Variants: Story = {
   ),
 };
 
-const variants = ["default", "secondary", "outline", "ghost", "destructive", "link"] as const;
+const variants = [
+  "default",
+  "secondary",
+  "outline",
+  "ghost",
+  "destructive",
+  "success",
+  "warning",
+  "link",
+] as const;
 
 export const VariantsWithIcons: Story = {
   render: (args) => (
@@ -56,18 +71,19 @@ export const VariantsWithIcons: Story = {
 export const DeploymentStatuses: Story = {
   render: (args) => (
     <div className="flex flex-wrap gap-2">
-      <Badge {...args}>Running</Badge>
-      <Badge {...args} variant="secondary">
+      <Badge {...args} variant="success">
+        Running
+      </Badge>
+      <Badge {...args} variant="warning">
         <Spinner />
-        Building <span className="tabular-nums">14s</span>
+        Deploying <span className="tabular-nums">14s</span>
       </Badge>
       <Badge {...args} variant="destructive">
         <CircleAlertIcon data-icon="inline-start" />
         Failed
       </Badge>
-      <Badge {...args} variant="outline">
-        <MoonIcon data-icon="inline-start" />
-        Sleeping
+      <Badge {...args} variant="destructive">
+        Stopped
       </Badge>
     </div>
   ),

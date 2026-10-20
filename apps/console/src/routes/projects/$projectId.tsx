@@ -24,6 +24,7 @@ import {
   ItemSeparator,
   ItemTitle,
 } from "@repo/ui/primitives/item";
+import { StatusDot } from "@repo/ui/primitives/status-dot";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Fragment } from "react";
@@ -74,7 +75,11 @@ function ProjectPage() {
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
           <Badge variant="outline" title={`Connection: ${live?.connection ?? "connecting"}`}>
-            {live?.mode === "live" ? "● Live" : "Polling every 30s"}
+            <StatusDot
+              tone={live?.mode === "live" ? "success" : live ? "warning" : "muted"}
+              pulse={live?.mode === "live"}
+            />
+            {live?.mode === "live" ? "Live" : "Polling every 30s"}
           </Badge>
         </div>
         {project.environments.length > 1 && (
