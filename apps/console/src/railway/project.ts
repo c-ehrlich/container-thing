@@ -118,6 +118,39 @@ export async function stopService(
   return { ...target, alreadyStopped: false };
 }
 
+const CreateServiceMutation = graphql(`
+  mutation CreateService($input: ServiceCreateInput!) {
+    serviceCreate(input: $input) {
+      id
+    }
+  }
+`);
+
+const NewService = z.object({
+  projectId: z.string(),
+  environmentId: z.string(),
+  name: z.string().min(1),
+  image: z.string().min(1),
+  variables: z.record(z.string(), z.string()),
+});
+
+/**
+ * Creates a service from a Docker image. Railway deploys it right away; `${{ secret() }}` and
+ * reference variables are resolved then, as in templates.
+ */
+export async function createService(railway: RailwayClient, input: z.infer<typeof NewService>) {
+  const { serviceCreate } = await railway(CreateServiceMutation, {
+    input: {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      name: input.name,
+      source: { image: input.image },
+      variables: input.variables,
+    },
+  });
+  return serviceCreate.id;
+}
+
 const getProjectFn = createServerFn({ method: "GET" })
   .middleware([requireRailway])
   .validator(z.object({ projectId: z.string() }))
@@ -129,6 +162,11 @@ export const deployServiceFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await deployService(context.railway, data);
   });
+
+export const createServiceFn = createServerFn({ method: "POST" })
+  .middleware([requireRailway])
+  .validator(NewService)
+  .handler(({ data, context }) => createService(context.railway, data));
 
 export const removeDeploymentFn = createServerFn({ method: "POST" })
   .middleware([requireRailway])

@@ -10,6 +10,7 @@ import {
 import { Button, buttonVariants } from "@repo/ui/primitives/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -30,6 +31,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Fragment } from "react";
 import { z } from "zod";
 
+import { AddServiceDialog } from "../../add-service/add-service-dialog";
 import { deploymentState } from "../../railway/deployment-state";
 import { useWatchEnvironment } from "../../railway/live/watch-environment";
 import {
@@ -107,6 +109,9 @@ function ProjectPage() {
           <CardHeader>
             <CardTitle>Services</CardTitle>
             <CardDescription>{environment.name}</CardDescription>
+            <CardAction>
+              <AddServiceDialog projectId={projectId} environmentId={environment.id} />
+            </CardAction>
           </CardHeader>
           <CardContent>
             <ItemGroup className="gap-0">

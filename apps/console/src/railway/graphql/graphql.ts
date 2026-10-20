@@ -9,6 +9,7 @@ export const graphql = initGraphQLTada<{
     DateTime: string;
     BigInt: string;
     JSON: unknown;
+    EnvironmentVariables: Record<string, string>;
     SerializedTemplateConfig: unknown;
   };
 }>();
