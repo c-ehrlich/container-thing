@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import { Streamdown } from "streamdown";
 
 import { projectQuery } from "../railway/project";
 import type { ChatMessage } from "./tools";
@@ -19,7 +20,7 @@ export function MessagePart(props: { part: Part; onApproval: ApprovalHandler }) 
   const { part, onApproval } = props;
   switch (part.type) {
     case "text":
-      return <p className="text-sm whitespace-pre-wrap">{part.text}</p>;
+      return <Streamdown className="text-sm">{part.text}</Streamdown>;
     case "tool-listProjects":
       return <ListProjectsPart part={part} />;
     case "tool-listServices":
