@@ -9,6 +9,9 @@ export const env = createEnv({
     SESSION_SECRET: z.string().min(32),
     /** Public origin of this app. Must match the redirect URI registered on the Railway OAuth app. */
     APP_URL: z.url().default("http://localhost:3000"),
+    OPENROUTER_API_KEY: z.string().min(1),
+    /** Any tool-capable model on OpenRouter. */
+    OPENROUTER_MODEL: z.string().min(1).default("anthropic/claude-haiku-5.5"),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   },
   runtimeEnv: process.env,
