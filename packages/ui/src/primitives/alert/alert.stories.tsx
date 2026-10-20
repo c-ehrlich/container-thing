@@ -31,6 +31,23 @@ export const Destructive: Story = {
   ),
 };
 
+export const Variants: Story = {
+  render: (args) => (
+    <div className="grid w-96 gap-3">
+      <Alert {...args}>
+        <InfoIcon />
+        <AlertTitle>Default</AlertTitle>
+        <AlertDescription>Preview environments sleep after 30 minutes idle.</AlertDescription>
+      </Alert>
+      <Alert {...args} variant="destructive">
+        <AlertCircleIcon />
+        <AlertTitle>Destructive</AlertTitle>
+        <AlertDescription>The cron service failed to start. Check its logs.</AlertDescription>
+      </Alert>
+    </div>
+  ),
+};
+
 export const WithAction: Story = {
   render: (args) => (
     <Alert {...args} className="w-96">

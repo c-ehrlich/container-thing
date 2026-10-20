@@ -1,15 +1,32 @@
 import { Badge } from "@repo/ui/primitives/badge";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@repo/ui/primitives/breadcrumb";
 import { Button, buttonVariants } from "@repo/ui/primitives/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@repo/ui/primitives/card";
 import {
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemGroup,
+  ItemSeparator,
   ItemTitle,
 } from "@repo/ui/primitives/item";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { Fragment } from "react";
 import { z } from "zod";
 
 import { deploymentState } from "../../railway/deployment-state";
@@ -43,9 +60,17 @@ function ProjectPage() {
   return (
     <main className="mx-auto grid max-w-2xl gap-6 p-8">
       <header className="grid gap-2">
-        <Link to="/" className="text-sm text-muted-foreground hover:underline">
-          ← Projects
-        </Link>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink render={<Link to="/" />}>Projects</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{project.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
           <Badge variant="outline" title={`Connection: ${live?.connection ?? "connecting"}`}>
@@ -73,16 +98,26 @@ function ProjectPage() {
       </header>
 
       {environment && (
-        <ItemGroup className="gap-2">
-          {environment.services.map((service) => (
-            <ServiceRow
-              key={service.id}
-              projectId={projectId}
-              environmentId={environment.id}
-              service={service}
-            />
-          ))}
-        </ItemGroup>
+        <Card>
+          <CardHeader>
+            <CardTitle>Services</CardTitle>
+            <CardDescription>{environment.name}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ItemGroup className="gap-0">
+              {environment.services.map((service, index) => (
+                <Fragment key={service.id}>
+                  {index > 0 && <ItemSeparator />}
+                  <ServiceRow
+                    projectId={projectId}
+                    environmentId={environment.id}
+                    service={service}
+                  />
+                </Fragment>
+              ))}
+            </ItemGroup>
+          </CardContent>
+        </Card>
       )}
     </main>
   );
@@ -108,7 +143,7 @@ function ServiceRow(props: { projectId: string; environmentId: string; service: 
   const busy = deploy.isPending || remove.isPending || state.kind === "pending";
 
   return (
-    <Item variant="outline">
+    <Item className="px-0">
       <ItemContent>
         <ItemTitle>{service.name}</ItemTitle>
         {service.source && <ItemDescription>{service.source}</ItemDescription>}

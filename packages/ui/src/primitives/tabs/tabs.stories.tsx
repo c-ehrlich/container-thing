@@ -26,6 +26,27 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const Variants: Story = {
+  render: (args) => (
+    <div className="grid gap-6">
+      {(["default", "line"] as const).map((variant) => (
+        <div key={variant} className="grid gap-2">
+          <span className="text-xs text-muted-foreground">{variant}</span>
+          <Tabs {...args}>
+            <TabsList variant={variant}>
+              <TabsTrigger value="account">Account</TabsTrigger>
+              <TabsTrigger value="password">Password</TabsTrigger>
+              <TabsTrigger value="billing" disabled>
+                Billing
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      ))}
+    </div>
+  ),
+};
+
 export const Line: Story = {
   render: (args) => (
     <Tabs {...args}>

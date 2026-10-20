@@ -1,8 +1,10 @@
 import { Button, buttonVariants } from "@repo/ui/primitives/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/primitives/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@repo/ui/primitives/empty";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@repo/ui/primitives/item";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { ChevronRightIcon } from "lucide-react";
 
 import { createRailwayClient } from "../railway/railway-api";
 import { getFreshSession } from "../railway/railway-oauth";
@@ -64,19 +66,22 @@ function Home() {
                 <CardTitle>{workspace.name}</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="grid gap-1 text-sm">
+                <ItemGroup className="gap-1">
                   {workspace.projects.map((project) => (
-                    <li key={project.id}>
-                      <Link
-                        to="/projects/$projectId"
-                        params={{ projectId: project.id }}
-                        className="hover:underline"
-                      >
-                        {project.name}
-                      </Link>
-                    </li>
+                    <Item
+                      key={project.id}
+                      size="sm"
+                      render={<Link to="/projects/$projectId" params={{ projectId: project.id }} />}
+                    >
+                      <ItemContent>
+                        <ItemTitle>{project.name}</ItemTitle>
+                      </ItemContent>
+                      <ItemActions>
+                        <ChevronRightIcon className="size-4 text-muted-foreground" />
+                      </ItemActions>
+                    </Item>
                   ))}
-                </ul>
+                </ItemGroup>
               </CardContent>
             </Card>
           ))

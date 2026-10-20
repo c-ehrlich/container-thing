@@ -1,3 +1,5 @@
+import { Alert, AlertDescription } from "@repo/ui/primitives/alert";
+import { Card } from "@repo/ui/primitives/card";
 import {
   Item,
   ItemActions,
@@ -9,6 +11,7 @@ import {
 import { Skeleton } from "@repo/ui/primitives/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { CircleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useWatchEnvironment } from "../railway/live/watch-environment";
@@ -45,14 +48,16 @@ export function ServiceWidget(props: {
     return <WidgetError>{error?.message ?? "Couldn't find this service."}</WidgetError>;
   }
   return (
-    <Item variant="outline" size="sm">
-      <ServiceSummary
-        service={service}
-        context={`${project.name} · ${environment.name}`}
-        projectId={projectId}
-        environmentId={environmentId}
-      />
-    </Item>
+    <WidgetCard>
+      <Item size="xs">
+        <ServiceSummary
+          service={service}
+          context={`${project.name} · ${environment.name}`}
+          projectId={projectId}
+          environmentId={environmentId}
+        />
+      </Item>
+    </WidgetCard>
   );
 }
 
@@ -65,18 +70,20 @@ export function ServiceListWidget(props: { projectId: string; environmentId: str
     return <WidgetError>{error?.message ?? "Couldn't find this environment."}</WidgetError>;
   }
   return (
-    <ItemGroup className="gap-1 rounded-lg border p-1">
-      {environment.services.map((service) => (
-        <Item key={service.id} size="xs">
-          <ServiceSummary
-            service={service}
-            context={service.source ?? undefined}
-            projectId={projectId}
-            environmentId={environmentId}
-          />
-        </Item>
-      ))}
-    </ItemGroup>
+    <WidgetCard>
+      <ItemGroup className="gap-0">
+        {environment.services.map((service) => (
+          <Item key={service.id} size="xs">
+            <ServiceSummary
+              service={service}
+              context={service.source ?? undefined}
+              projectId={projectId}
+              environmentId={environmentId}
+            />
+          </Item>
+        ))}
+      </ItemGroup>
+    </WidgetCard>
   );
 }
 
@@ -109,10 +116,20 @@ function ServiceSummary(props: {
   );
 }
 
+/** The surface chat widgets sit on, so they stand out from the conversation around them. */
+export function WidgetCard(props: { children: ReactNode }) {
+  return (
+    <Card size="sm" className="py-1">
+      {props.children}
+    </Card>
+  );
+}
+
 export function WidgetError(props: { children: ReactNode }) {
   return (
-    <p className="rounded-lg border border-destructive/30 px-3 py-2 text-sm text-destructive">
-      {props.children}
-    </p>
+    <Alert variant="destructive">
+      <CircleAlertIcon />
+      <AlertDescription>{props.children}</AlertDescription>
+    </Alert>
   );
 }

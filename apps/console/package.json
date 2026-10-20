@@ -24,6 +24,7 @@
     "gql.tada": "^1.11.4",
     "graphql-ws": "^6.4.1",
     "jose": "^6.2.12",
+    "lucide-react": "^1.59.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "^4.6.7"

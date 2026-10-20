@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { BadgeCheckIcon } from "lucide-react";
+import { BadgeCheckIcon, CircleAlertIcon, MoonIcon } from "lucide-react";
 
+import { Spinner } from "../spinner/spinner";
 import { Badge } from "./badge";
 
 const meta = {
@@ -31,6 +32,42 @@ export const Variants: Story = {
       </Badge>
       <Badge {...args} variant="link">
         Link
+      </Badge>
+    </div>
+  ),
+};
+
+const variants = ["default", "secondary", "outline", "ghost", "destructive", "link"] as const;
+
+export const VariantsWithIcons: Story = {
+  render: (args) => (
+    <div className="flex flex-wrap gap-2">
+      {variants.map((variant) => (
+        <Badge {...args} key={variant} variant={variant}>
+          <BadgeCheckIcon data-icon="inline-start" />
+          {variant}
+        </Badge>
+      ))}
+    </div>
+  ),
+};
+
+/** The deployment statuses the console app shows. */
+export const DeploymentStatuses: Story = {
+  render: (args) => (
+    <div className="flex flex-wrap gap-2">
+      <Badge {...args}>Running</Badge>
+      <Badge {...args} variant="secondary">
+        <Spinner />
+        Building <span className="tabular-nums">14s</span>
+      </Badge>
+      <Badge {...args} variant="destructive">
+        <CircleAlertIcon data-icon="inline-start" />
+        Failed
+      </Badge>
+      <Badge {...args} variant="outline">
+        <MoonIcon data-icon="inline-start" />
+        Sleeping
       </Badge>
     </div>
   ),

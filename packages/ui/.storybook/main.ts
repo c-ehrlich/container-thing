@@ -3,7 +3,10 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default {
   framework: "@storybook/react-vite",
-  stories: [{ directory: "../src/primitives", titlePrefix: "Primitives" }],
+  stories: [
+    { directory: "../src/foundations", titlePrefix: "Foundations" },
+    { directory: "../src/primitives", titlePrefix: "Primitives" },
+  ],
   addons: ["@storybook/addon-a11y", "@storybook/addon-themes"],
   core: { disableTelemetry: true },
   viteFinal: (config) => ({

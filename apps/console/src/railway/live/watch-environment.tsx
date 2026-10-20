@@ -40,8 +40,7 @@ function subscribeToRegistry(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-const watchKey = (projectId: string, environmentId: string) =>
-  `${projectId}/${environmentId}`;
+const watchKey = (projectId: string, environmentId: string) => `${projectId}/${environmentId}`;
 
 /** Keeps an environment live while mounted and returns its status once the watcher starts. */
 export function useWatchEnvironment(
@@ -55,10 +54,7 @@ export function useWatchEnvironment(
 
   return useSyncExternalStore(
     subscribeToRegistry,
-    () =>
-      environmentId
-        ? registry.get(watchKey(projectId, environmentId))?.status
-        : undefined,
+    () => (environmentId ? registry.get(watchKey(projectId, environmentId))?.status : undefined),
     () => undefined,
   );
 }
@@ -97,9 +93,7 @@ export function LiveEnvironments() {
     () => watches,
     () => watches,
   );
-  return current.map((watch) => (
-    <EnvironmentWatcher key={watch.key} watch={watch} />
-  ));
+  return current.map((watch) => <EnvironmentWatcher key={watch.key} watch={watch} />);
 }
 
 function EnvironmentWatcher(props: { watch: Watch }) {
@@ -112,9 +106,7 @@ function EnvironmentWatcher(props: { watch: Watch }) {
     query,
     environmentId,
     deploymentIds:
-      environment?.services.flatMap((s) =>
-        s.deployment ? [s.deployment.id] : [],
-      ) ?? [],
+      environment?.services.flatMap((s) => (s.deployment ? [s.deployment.id] : [])) ?? [],
   });
 
   useEffect(() => {

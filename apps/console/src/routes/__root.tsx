@@ -1,4 +1,9 @@
-import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+} from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 
@@ -26,7 +31,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   loader: () => getSignedIn(),
   staleTime: Number.POSITIVE_INFINITY,
   shellComponent: ({ children }: { children: ReactNode }) => (
-    <html lang="en">
+    <html lang="en" className="dark scheme-dark">
       <head>
         <HeadContent />
       </head>

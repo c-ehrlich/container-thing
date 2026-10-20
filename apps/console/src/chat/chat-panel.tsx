@@ -6,6 +6,7 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@repo/ui/primitives/input-group";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@repo/ui/primitives/item";
 import { Spinner } from "@repo/ui/primitives/spinner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useMatch } from "@tanstack/react-router";
@@ -15,7 +16,7 @@ import type { ReactNode } from "react";
 
 import { projectQuery } from "../railway/project";
 import type { ChatMessage } from "./tools";
-import { ServiceListWidget, ServiceWidget, WidgetError } from "./widgets";
+import { ServiceListWidget, ServiceWidget, WidgetCard, WidgetError } from "./widgets";
 
 type Part = ChatMessage["parts"][number];
 type ToolPart<Name extends string> = Extract<Part, { type: `tool-${Name}` }>;
@@ -170,22 +171,24 @@ function ListProjectsPart(props: { part: ToolPart<"listProjects"> }) {
   switch (part.state) {
     case "output-available":
       return (
-        <ul className="grid gap-1 rounded-lg border p-3 text-sm">
-          {part.output.flatMap((workspace) =>
-            workspace.projects.map((project) => (
-              <li key={project.id}>
-                <Link
-                  to="/projects/$projectId"
-                  params={{ projectId: project.id }}
-                  className="hover:underline"
+        <WidgetCard>
+          <ItemGroup className="gap-0">
+            {part.output.flatMap((workspace) =>
+              workspace.projects.map((project) => (
+                <Item
+                  key={project.id}
+                  size="xs"
+                  render={<Link to="/projects/$projectId" params={{ projectId: project.id }} />}
                 >
-                  {project.name}
-                </Link>{" "}
-                <span className="text-muted-foreground">· {workspace.name}</span>
-              </li>
-            )),
-          )}
-        </ul>
+                  <ItemContent className="min-w-0">
+                    <ItemTitle>{project.name}</ItemTitle>
+                    <ItemDescription className="truncate">{workspace.name}</ItemDescription>
+                  </ItemContent>
+                </Item>
+              )),
+            )}
+          </ItemGroup>
+        </WidgetCard>
       );
     case "output-error":
       return <WidgetError>{part.errorText}</WidgetError>;
