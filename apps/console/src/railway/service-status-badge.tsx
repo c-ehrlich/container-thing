@@ -1,18 +1,19 @@
 import { Badge } from "@repo/ui/primitives/badge";
 import { Spinner } from "@repo/ui/primitives/spinner";
-import { CircleAlertIcon } from "lucide-react";
+import { CircleAlertIcon, MoonIcon, SquareIcon } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
 import { deploymentState } from "./deployment-state";
 import type { DeploymentState } from "./deployment-state";
 import type { Deployment } from "./project";
 
-/** Green when up, yellow on its way, red when broken or off. */
+/** Color only where it matters: green when up, yellow on its way, red when broken. Off is gray. */
 const BADGE_VARIANT = {
   running: "success",
+  sleeping: "outline",
   pending: "warning",
   failed: "destructive",
-  stopped: "destructive",
+  stopped: "muted",
 } as const satisfies Record<DeploymentState["kind"], string>;
 
 /** A service's status as shown everywhere in the app: project page and chat widgets alike. */
@@ -23,6 +24,8 @@ export function ServiceStatusBadge(props: { deployment: Deployment | null }) {
     <Badge variant={BADGE_VARIANT[state.kind]}>
       {state.kind === "pending" && <Spinner />}
       {state.kind === "failed" && <CircleAlertIcon data-icon="inline-start" />}
+      {state.kind === "sleeping" && <MoonIcon data-icon="inline-start" />}
+      {state.kind === "stopped" && <SquareIcon data-icon="inline-start" />}
       {state.label}
       {state.kind === "pending" && deployment && <Elapsed since={deployment.createdAt} />}
     </Badge>

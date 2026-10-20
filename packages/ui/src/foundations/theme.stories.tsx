@@ -122,7 +122,8 @@ function Specimen() {
           <Spinner />
           Deploying
         </Badge>
-        <Badge variant="destructive">Stopped</Badge>
+        <Badge variant="destructive">Failed</Badge>
+        <Badge variant="muted">Stopped</Badge>
         <Badge>Default</Badge>
         <Badge variant="secondary">Secondary</Badge>
         <Badge variant="outline">

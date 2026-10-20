@@ -1,11 +1,11 @@
 import type { Deployment } from "./project";
 
 export type DeploymentState = {
-  kind: "running" | "pending" | "failed" | "stopped";
+  kind: "running" | "sleeping" | "pending" | "failed" | "stopped";
   label: string;
 };
 
-/** What a service's latest deployment means for the user: is it up, on its way, broken or off? */
+/** What a service's latest deployment means for the user: is it up, idle, on its way, broken or off? */
 export function deploymentState(deployment: Deployment | null): DeploymentState {
   switch (deployment?.status) {
     case undefined:
@@ -15,7 +15,8 @@ export function deploymentState(deployment: Deployment | null): DeploymentState 
     case "SUCCESS":
       return { kind: "running", label: "Running" };
     case "SLEEPING":
-      return { kind: "stopped", label: "Sleeping" };
+      // Railway's Serverless: still deployed, just idle. The next request wakes it.
+      return { kind: "sleeping", label: "Sleeping" };
     case "FAILED":
     case "CRASHED":
       return {
