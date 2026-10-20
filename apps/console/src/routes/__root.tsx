@@ -8,7 +8,6 @@ import { createServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 
 import { ChatPanel } from "../chat/chat-panel";
-import { LiveEnvironments } from "../railway/live/watch-environment";
 import { getFreshSession } from "../railway/railway-oauth";
 import type { RouterContext } from "../router";
 
@@ -52,7 +51,6 @@ function RootLayout() {
         <Outlet />
       </div>
       {signedIn && <ChatPanel />}
-      <LiveEnvironments />
     </div>
   );
 }
