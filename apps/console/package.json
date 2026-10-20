@@ -7,6 +7,8 @@
     "build": "vite build",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "graphql:generate": "sh scripts/generate-graphql.sh"
   },
   "dependencies": {
@@ -38,6 +40,7 @@
     "nitro": "^3.0.260903-beta",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "^5.0.5"
   }
 }
