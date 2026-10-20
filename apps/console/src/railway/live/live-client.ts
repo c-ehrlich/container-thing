@@ -3,7 +3,6 @@ import { createServerFn } from "@tanstack/react-start";
 import type { TadaDocumentNode } from "gql.tada";
 import { createClient } from "graphql-ws";
 import type { Client } from "graphql-ws";
-import { useSyncExternalStore } from "react";
 
 import { getFreshSession } from "../railway-oauth";
 
@@ -67,15 +66,14 @@ function liveClient(): Client {
   return client;
 }
 
-export function useLiveConnection(): LiveConnection {
-  return useSyncExternalStore(
-    (listener) => {
-      connectionListeners.add(listener);
-      return () => connectionListeners.delete(listener);
-    },
-    () => connection,
-    () => "connecting",
-  );
+export function getLiveConnection(): LiveConnection {
+  return connection;
+}
+
+/** Calls `listener` whenever the connection state changes. */
+export function onLiveConnectionChange(listener: () => void): () => void {
+  connectionListeners.add(listener);
+  return () => connectionListeners.delete(listener);
 }
 
 /** Calls `listener` after the connection comes back from a drop. */
