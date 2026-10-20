@@ -1,0 +1,4749 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      How the project page stays live: queries, mutations, subscriptions (Console walkthrough)
+    </title>
+    <style>
+      :root {
+        --bg: #0d0f14;
+        --bg-2: #141821;
+        --bg-3: #1b2030;
+        --line: #2a3142;
+        --text: #e6e9ef;
+        --muted: #9aa3b5;
+        --faint: #6b7385;
+        --browser: #4cc2ff;
+        --server: #3ddc97;
+        --railway: #a78bfa;
+        --secret: #fbbf24;
+        --danger: #f87171;
+        --ok: #4ade80;
+        --radius: 14px;
+        --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+        --sans: ui-sans-serif, -apple-system, "Inter", "Segoe UI", system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 72px;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.65 var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: var(--browser);
+      }
+      code,
+      pre,
+      .mono {
+        font-family: var(--mono);
+        font-size: 0.86em;
+      }
+      :not(pre) > code {
+        background: var(--bg-3);
+        padding: 0.1em 0.4em;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        letter-spacing: -0.015em;
+      }
+      h2 {
+        font-size: 1.9rem;
+        margin: 0 0 0.4rem;
+      }
+      h3 {
+        font-size: 1.2rem;
+        margin: 1.6rem 0 0.4rem;
+      }
+      p {
+        margin: 0.5rem 0 0.9rem;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .b {
+        color: var(--browser);
+      }
+      .s {
+        color: var(--server);
+      }
+      .r {
+        color: var(--railway);
+      }
+      .k {
+        color: var(--secret);
+      }
+      .bad {
+        color: var(--danger);
+      }
+      .good {
+        color: var(--ok);
+      }
+
+      /* ---------- nav ---------- */
+      nav.top {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        backdrop-filter: blur(10px);
+        background: color-mix(in srgb, var(--bg) 82%, transparent);
+        border-bottom: 1px solid var(--line);
+      }
+      nav.top .inner {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: flex;
+        gap: 4px;
+        padding: 10px 20px;
+        overflow-x: auto;
+      }
+      nav.top a {
+        color: var(--muted);
+        text-decoration: none;
+        white-space: nowrap;
+        font-size: 0.85rem;
+        padding: 6px 10px;
+        border-radius: 8px;
+      }
+      nav.top a:hover {
+        color: var(--text);
+        background: var(--bg-3);
+      }
+      nav.top a.active {
+        color: var(--text);
+        background: var(--bg-3);
+      }
+      #progress {
+        position: absolute;
+        left: 0;
+        bottom: -1px;
+        height: 2px;
+        background: linear-gradient(90deg, var(--browser), var(--server), var(--railway));
+        width: 0;
+      }
+
+      section {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 72px 20px 24px;
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 0.72rem;
+        color: var(--faint);
+        font-weight: 600;
+      }
+      .lede {
+        font-size: 1.12rem;
+        color: var(--muted);
+        max-width: 760px;
+      }
+      .card {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 20px;
+      }
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+      .g2 {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      }
+      .g3 {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+      .g4 {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+      button,
+      .btn {
+        font: inherit;
+        font-size: 0.9rem;
+        color: var(--text);
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        padding: 8px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          transform 0.05s;
+      }
+      button:hover {
+        border-color: #3b4560;
+        background: #222839;
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      button.primary {
+        background: #e6e9ef;
+        color: #0d0f14;
+        border-color: #e6e9ef;
+        font-weight: 600;
+      }
+      button.primary:hover {
+        background: #fff;
+      }
+      button[aria-pressed="true"],
+      button.on {
+        border-color: var(--text);
+        background: #262d40;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--bg-3);
+        color: var(--muted);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      input[type="text"],
+      textarea {
+        width: 100%;
+        font: 0.85rem/1.5 var(--mono);
+        color: var(--text);
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        resize: vertical;
+      }
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--server);
+      }
+
+      /* ---------- code ---------- */
+      pre.code {
+        margin: 10px 0;
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+        overflow-x: auto;
+        line-height: 1.55;
+        font-size: 0.8rem;
+        position: relative;
+      }
+      pre.code .file {
+        display: block;
+        color: var(--faint);
+        font-size: 0.72rem;
+        margin-bottom: 8px;
+        letter-spacing: 0.02em;
+      }
+      .tk-kw {
+        color: #c792ea;
+      }
+      .tk-str {
+        color: #c3e88d;
+      }
+      .tk-com {
+        color: #6b7385;
+        font-style: italic;
+      }
+      .tk-num {
+        color: #f78c6c;
+      }
+      .tk-fn {
+        color: #82aaff;
+      }
+      .tk-ty {
+        color: #ffcb6b;
+      }
+      pre.code mark {
+        background: rgba(251, 191, 36, 0.13);
+        color: inherit;
+        border-radius: 3px;
+        box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.13);
+      }
+
+      /* ---------- hero ---------- */
+      .hero {
+        padding-top: 64px;
+      }
+      .hero h1 {
+        font-size: clamp(2.2rem, 5vw, 3.6rem);
+        margin: 8px 0 12px;
+      }
+      .hero h1 .grad {
+        background: linear-gradient(90deg, var(--browser), var(--server) 50%, var(--railway));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .cast {
+        margin-top: 28px;
+      }
+      .actor {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+      }
+      .actor .icon {
+        flex: none;
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+      }
+      .actor h4 {
+        margin: 0 0 2px;
+        font-size: 1rem;
+      }
+      .actor p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      /* valet analogy */
+      .analogy {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 12px;
+        align-items: stretch;
+      }
+      .analogy .cell {
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 0.92rem;
+      }
+      .analogy .arrow {
+        color: var(--faint);
+        align-self: center;
+        text-align: center;
+      }
+      @media (max-width: 700px) {
+        .analogy {
+          grid-template-columns: 1fr;
+        }
+        .analogy .arrow {
+          display: none;
+        }
+      }
+
+      /* ---------- file map ---------- */
+      .files {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 860px) {
+        .files {
+          grid-template-columns: 1fr;
+        }
+      }
+      .filelist {
+        display: grid;
+        gap: 4px;
+        align-content: start;
+      }
+      .filelist .group {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--faint);
+        margin: 12px 4px 4px;
+      }
+      .filelist button {
+        text-align: left;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        padding: 8px 10px;
+        background: transparent;
+        border-color: transparent;
+      }
+      .filelist button:hover {
+        background: var(--bg-3);
+      }
+      .filelist button.on {
+        background: var(--bg-3);
+        border-color: var(--line);
+      }
+      .tag {
+        font-family: var(--sans);
+        font-size: 0.66rem;
+        padding: 1px 7px;
+        border-radius: 999px;
+        border: 1px solid;
+      }
+      .tag.new {
+        color: var(--ok);
+        border-color: rgba(74, 222, 128, 0.35);
+      }
+      .tag.mod {
+        color: var(--secret);
+        border-color: rgba(251, 191, 36, 0.35);
+      }
+
+      /* ---------- sequence player ---------- */
+      .player {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 980px) {
+        .player {
+          grid-template-columns: 1fr;
+        }
+      }
+      .stage {
+        position: relative;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .stage svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .stage-scroll {
+        max-height: 640px;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      }
+      .lanes-head {
+        display: grid;
+        grid-template-columns: 30% 40% 30%;
+        text-align: center;
+        padding: 12px 0 8px;
+        border-bottom: 1px solid var(--line);
+        background: var(--bg-2);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      .lanes-head div {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .lanes-head small {
+        display: block;
+        font-weight: 400;
+        color: var(--faint);
+        font-size: 0.72rem;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        padding: 12px;
+        border-top: 1px solid var(--line);
+        background: var(--bg-2);
+      }
+      .controls .count {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 0.82rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin: 14px 0;
+      }
+      .detail {
+        position: sticky;
+        top: 76px;
+      }
+      .detail .step-title {
+        font-size: 1.15rem;
+        font-weight: 650;
+        margin: 6px 0 4px;
+      }
+      .envelope {
+        margin-top: 12px;
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: #0a0c10;
+        font: 0.76rem/1.6 var(--mono);
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: var(--muted);
+      }
+      .envelope .h {
+        color: var(--text);
+      }
+      .envelope .sec {
+        color: var(--secret);
+      }
+      .channel {
+        font-size: 0.72rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .channel.front {
+        background: rgba(76, 194, 255, 0.12);
+        color: var(--browser);
+      }
+      .channel.back {
+        background: rgba(251, 191, 36, 0.12);
+        color: var(--secret);
+      }
+      .channel.local {
+        background: rgba(61, 220, 151, 0.12);
+        color: var(--server);
+      }
+      .legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 10px;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend i {
+        display: inline-block;
+        width: 26px;
+        height: 0;
+        border-top: 2px solid;
+      }
+
+      svg .msg {
+        opacity: 0.28;
+        transition: opacity 0.35s;
+        cursor: pointer;
+      }
+      svg .msg.past {
+        opacity: 0.5;
+      }
+      svg .msg.current {
+        opacity: 1;
+      }
+      svg .msg text {
+        font: 15px var(--sans);
+        fill: var(--text);
+      }
+      svg .msg .num {
+        font: 600 11px var(--mono);
+        fill: var(--bg);
+      }
+      svg .msg.future {
+        opacity: 0.08;
+      }
+      svg .msg.current .draw {
+        stroke-dasharray: var(--len);
+        stroke-dashoffset: var(--len);
+        animation: draw 0.7s ease forwards;
+      }
+      @keyframes draw {
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+      svg .packet {
+        filter: drop-shadow(0 0 6px currentColor);
+      }
+
+      /* ---------- labs ---------- */
+      .lab {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 22px;
+        margin: 18px 0 28px;
+      }
+      .lab-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .lab-head h3 {
+        margin: 0;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 6px 14px;
+        font-size: 0.86rem;
+        align-items: baseline;
+      }
+      .kv .k2 {
+        color: var(--faint);
+      }
+      .kv .v {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        word-break: break-all;
+      }
+      .verdict {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        font-size: 0.92rem;
+        border: 1px solid var(--line);
+        background: var(--bg-3);
+        transition: all 0.25s;
+      }
+      .verdict.ok {
+        border-color: rgba(74, 222, 128, 0.4);
+        background: rgba(74, 222, 128, 0.07);
+      }
+      .verdict.no {
+        border-color: rgba(248, 113, 113, 0.45);
+        background: rgba(248, 113, 113, 0.07);
+      }
+      .verdict.warn {
+        border-color: rgba(251, 191, 36, 0.45);
+        background: rgba(251, 191, 36, 0.07);
+      }
+
+      .jwe {
+        font: 0.78rem/1.7 var(--mono);
+        word-break: break-all;
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+        min-height: 64px;
+      }
+      .jwe span {
+        border-radius: 3px;
+      }
+      .jwe .p0 {
+        color: #82aaff;
+      }
+      .jwe .p1 {
+        color: var(--faint);
+      }
+      .jwe .p2 {
+        color: #f78c6c;
+      }
+      .jwe .p3 {
+        color: var(--secret);
+      }
+      .jwe .p4 {
+        color: #c792ea;
+      }
+      .jwe .flip {
+        background: var(--danger);
+        color: #000;
+      }
+      .seg-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 0.78rem;
+        margin-top: 8px;
+        color: var(--muted);
+      }
+
+      /* battery */
+      .battery {
+        position: relative;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: #0a0c10;
+        overflow: hidden;
+      }
+      .battery .fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: linear-gradient(90deg, var(--server), #2bb57b);
+        transition:
+          width 0.2s,
+          background 0.2s;
+      }
+      .battery .zone {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: calc(100% / 60);
+        background: repeating-linear-gradient(
+          45deg,
+          rgba(248, 113, 113, 0.35) 0 4px,
+          transparent 4px 8px
+        );
+      }
+      .battery .label {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font: 600 0.82rem var(--mono);
+        color: #fff;
+        text-shadow: 0 1px 2px #000;
+      }
+
+      /* flip cards */
+      .flipcard {
+        perspective: 900px;
+        min-height: 210px;
+        cursor: pointer;
+      }
+      .flipcard .inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        min-height: 210px;
+        transition: transform 0.55s;
+        transform-style: preserve-3d;
+      }
+      .flipcard.flipped .inner {
+        transform: rotateY(180deg);
+      }
+      .flipcard .face {
+        position: absolute;
+        inset: 0;
+        backface-visibility: hidden;
+        border-radius: var(--radius);
+        border: 1px solid var(--line);
+        background: var(--bg-2);
+        padding: 18px;
+      }
+      .flipcard .back {
+        transform: rotateY(180deg);
+        background: #1a1414;
+        border-color: rgba(248, 113, 113, 0.35);
+      }
+      .flipcard h4 {
+        margin: 0 0 6px;
+        font-family: var(--mono);
+        font-size: 0.95rem;
+      }
+      .flipcard p {
+        font-size: 0.88rem;
+        color: var(--muted);
+        margin: 0;
+      }
+      .flipcard .hint {
+        position: absolute;
+        bottom: 12px;
+        right: 14px;
+        font-size: 0.72rem;
+        color: var(--faint);
+      }
+
+      /* boundary */
+      .boundary {
+        display: grid;
+        grid-template-columns: 1fr 70px 1fr;
+        align-items: stretch;
+      }
+      .boundary .side {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 18px;
+      }
+      .boundary .wall {
+        display: grid;
+        place-items: center;
+      }
+      .boundary .wall div {
+        width: 6px;
+        height: 100%;
+        border-radius: 4px;
+        background: repeating-linear-gradient(180deg, var(--secret) 0 10px, transparent 10px 18px);
+        opacity: 0.7;
+      }
+      .chip {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 12px;
+        margin: 6px 0;
+        border-radius: 10px;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        font-size: 0.86rem;
+      }
+      .chip small {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+      }
+      @media (max-width: 760px) {
+        .boundary {
+          grid-template-columns: 1fr;
+        }
+        .boundary .wall {
+          height: 30px;
+        }
+        .boundary .wall div {
+          width: 100%;
+          height: 6px;
+          background: repeating-linear-gradient(90deg, var(--secret) 0 10px, transparent 10px 18px);
+        }
+      }
+      .devtools {
+        margin-top: 14px;
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font: 0.8rem/1.6 var(--mono);
+        padding: 12px;
+        min-height: 90px;
+        white-space: pre-wrap;
+      }
+      .devtools .prompt {
+        color: var(--browser);
+      }
+
+      /* failures */
+      .fail-list {
+        display: grid;
+        gap: 8px;
+      }
+      details.fail {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0 16px;
+      }
+      details.fail summary {
+        cursor: pointer;
+        padding: 14px 0;
+        list-style: none;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        font-weight: 550;
+      }
+      details.fail summary::-webkit-details-marker {
+        display: none;
+      }
+      details.fail summary::after {
+        content: "+";
+        color: var(--faint);
+        font-size: 1.2rem;
+      }
+      details.fail[open] summary::after {
+        content: "–";
+      }
+      details.fail .body {
+        padding-bottom: 14px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      .result {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        white-space: nowrap;
+      }
+
+      /* quiz */
+      .q {
+        margin: 16px 0;
+      }
+      .q .opts {
+        display: grid;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .q .opts button {
+        text-align: left;
+      }
+      .q .opts button.right {
+        border-color: var(--ok);
+        background: rgba(74, 222, 128, 0.1);
+      }
+      .q .opts button.wrong {
+        border-color: var(--danger);
+        background: rgba(248, 113, 113, 0.08);
+      }
+      .q .why {
+        font-size: 0.88rem;
+        color: var(--muted);
+        margin-top: 6px;
+        display: none;
+      }
+      .q.answered .why {
+        display: block;
+      }
+
+      footer {
+        max-width: 1180px;
+        margin: 40px auto 0;
+        padding: 30px 20px 60px;
+        color: var(--faint);
+        font-size: 0.85rem;
+        border-top: 1px solid var(--line);
+      }
+
+      .fade-in {
+        animation: fadein 0.4s ease;
+      }
+      @keyframes fadein {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+
+      /* ================================================================
+         Additions for the realtime walkthrough
+         ================================================================ */
+      :root {
+        --ws: #f472b6;
+      }
+      .w {
+        color: var(--ws);
+      }
+      kbd {
+        font: 0.78rem var(--mono);
+        padding: 1px 6px;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 6px;
+        background: var(--bg-3);
+      }
+      .channel.http {
+        background: rgba(76, 194, 255, 0.12);
+        color: var(--browser);
+      }
+      .channel.ws {
+        background: rgba(244, 114, 182, 0.12);
+        color: var(--ws);
+      }
+      .tldr {
+        margin-top: 22px;
+        display: grid;
+        gap: 10px;
+      }
+      .tldr .row {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 14px;
+        align-items: baseline;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+      }
+      .tldr .row b {
+        font-size: 0.95rem;
+      }
+      @media (max-width: 640px) {
+        .tldr .row {
+          grid-template-columns: 1fr;
+          gap: 2px;
+        }
+      }
+
+      /* verbs */
+      .verb h4 {
+        margin: 0;
+        font-size: 1.05rem;
+      }
+      .verb .sub {
+        color: var(--muted);
+        font-size: 0.88rem;
+        margin: 2px 0 0;
+      }
+      .verb .wire2 {
+        position: relative;
+        height: 96px;
+        margin: 14px 0 10px;
+        border-radius: 10px;
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        overflow: hidden;
+      }
+      .verb .end {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 70px;
+        text-align: center;
+        font-size: 0.7rem;
+        color: var(--faint);
+      }
+      .verb .end .ico {
+        display: block;
+        font-size: 22px;
+        line-height: 1.2;
+      }
+      .verb .end.l {
+        left: 4px;
+      }
+      .verb .end.r {
+        right: 4px;
+      }
+      .verb .track {
+        position: absolute;
+        left: 76px;
+        right: 76px;
+        top: 50%;
+        border-top: 1px dashed var(--line);
+      }
+      .verb .track.open {
+        border-top: 2px solid var(--ws);
+        box-shadow: 0 0 10px rgba(244, 114, 182, 0.35);
+      }
+      .verb .pk {
+        position: absolute;
+        top: calc(50% - 11px);
+        left: 0;
+        transform: translateX(-50%);
+        font: 600 0.66rem/1.6 var(--mono);
+        padding: 1px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+        color: #0d0f14;
+        pointer-events: none;
+      }
+      .verb .state {
+        position: absolute;
+        right: 8px;
+        bottom: 6px;
+        font: 0.66rem var(--mono);
+        color: var(--muted);
+      }
+      .verb .btns {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      /* glossary */
+      .gloss {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .gloss div {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+      .gloss b {
+        display: block;
+        color: var(--text);
+        font-size: 0.92rem;
+        margin-bottom: 2px;
+      }
+
+      /* big map */
+      .bigmap svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .bigmap .caption {
+        min-height: 3.2em;
+        margin-top: 10px;
+        font-size: 0.95rem;
+      }
+      .bigmap .box rect {
+        fill: var(--bg-3);
+        stroke: var(--line);
+        stroke-width: 1.5;
+        transition:
+          stroke 0.25s,
+          fill 0.25s;
+      }
+      .bigmap .box.hot rect {
+        stroke: currentColor;
+        fill: #222839;
+      }
+      .bigmap .box text {
+        fill: var(--text);
+        font: 600 15px var(--sans);
+      }
+      .bigmap .box text.small {
+        fill: var(--muted);
+        font: 12px var(--mono);
+      }
+      .bigmap .col {
+        font: 600 13px var(--sans);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .bigmap .conn {
+        stroke: var(--line);
+        stroke-width: 2;
+        transition: stroke 0.25s;
+      }
+      .bigmap .conn.hot {
+        stroke: currentColor;
+      }
+
+      /* protocol console */
+      .proto {
+        display: grid;
+        grid-template-columns: 290px minmax(0, 1fr);
+        gap: 16px;
+        margin-top: 14px;
+      }
+      @media (max-width: 860px) {
+        .proto {
+          grid-template-columns: 1fr;
+        }
+      }
+      .proto .actions {
+        display: grid;
+        gap: 6px;
+        align-content: start;
+      }
+      .proto .actions button {
+        text-align: left;
+        font-size: 0.82rem;
+      }
+      .proto .actions button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .proto .actions .group {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--faint);
+        margin: 8px 2px 0;
+      }
+      .wire {
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        height: 460px;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .wire-head {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.78rem;
+        color: var(--faint);
+        padding: 0 4px 6px;
+      }
+      .frame {
+        max-width: 80%;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font: 0.74rem/1.5 var(--mono);
+        border: 1px solid var(--line);
+        white-space: pre-wrap;
+        word-break: break-word;
+        animation: fadein 0.25s ease;
+      }
+      .frame.up {
+        align-self: flex-start;
+        background: rgba(76, 194, 255, 0.07);
+        border-color: rgba(76, 194, 255, 0.3);
+      }
+      .frame.down {
+        align-self: flex-end;
+        background: rgba(61, 220, 151, 0.07);
+        border-color: rgba(61, 220, 151, 0.3);
+      }
+      .frame.sys {
+        align-self: center;
+        max-width: 92%;
+        background: transparent;
+        border-style: dashed;
+        color: var(--muted);
+        font: 0.8rem/1.5 var(--sans);
+        text-align: center;
+      }
+      .frame.sys.bad {
+        border-color: rgba(248, 113, 113, 0.5);
+        color: var(--danger);
+      }
+      .frame .who {
+        display: block;
+        font: 600 0.64rem var(--sans);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+        margin-bottom: 3px;
+      }
+      .frame .note {
+        display: block;
+        font: 0.78rem/1.45 var(--sans);
+        color: var(--muted);
+        margin-top: 5px;
+        white-space: normal;
+      }
+      .subs {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        font-size: 0.78rem;
+        align-items: center;
+      }
+
+      /* endpointFor lab */
+      .router-lab {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        gap: 16px;
+        margin-top: 12px;
+      }
+      @media (max-width: 860px) {
+        .router-lab {
+          grid-template-columns: 1fr;
+        }
+      }
+      .router-lab textarea {
+        min-height: 210px;
+      }
+
+      /* polling lab + signal sim */
+      .timeline svg,
+      .sim svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .stats div {
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+      .stats b {
+        display: block;
+        font: 600 1.25rem var(--sans);
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+      .sim {
+        display: grid;
+        grid-template-columns: minmax(0, 1.75fr) minmax(250px, 1fr);
+        gap: 16px;
+        margin-top: 14px;
+      }
+      @media (max-width: 1000px) {
+        .sim {
+          grid-template-columns: 1fr;
+        }
+      }
+      .simbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-top: 12px;
+      }
+      .toggle {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 0.82rem;
+        color: var(--muted);
+        cursor: pointer;
+        user-select: none;
+      }
+      .toggle input {
+        accent-color: var(--server);
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .seg button {
+        border: 0;
+        border-radius: 0;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+      }
+      .seg button + button {
+        border-left: 1px solid var(--line);
+      }
+      .seg button.on {
+        background: #2d3550;
+      }
+      .mock {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+      }
+      .mock .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .mock .top b {
+        font-size: 1.05rem;
+      }
+      .mock .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 11px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        margin-top: 7px;
+        font-size: 0.88rem;
+        transition: background 0.6s;
+      }
+      .mock .row small {
+        display: block;
+        color: var(--faint);
+        font: 0.7rem var(--mono);
+      }
+      .badge {
+        font: 600 0.72rem var(--sans);
+        padding: 2px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        white-space: nowrap;
+        background: var(--bg-3);
+      }
+      .badge.run {
+        background: #e6e9ef;
+        color: #0d0f14;
+        border-color: #e6e9ef;
+      }
+      .badge.stop {
+        color: var(--muted);
+      }
+      .badge.fail {
+        background: rgba(248, 113, 113, 0.18);
+        color: var(--danger);
+        border-color: rgba(248, 113, 113, 0.4);
+      }
+      .badge.live {
+        color: var(--ok);
+        border-color: rgba(74, 222, 128, 0.4);
+        background: transparent;
+      }
+      .badge.poll {
+        color: var(--secret);
+        border-color: rgba(251, 191, 36, 0.4);
+        background: transparent;
+      }
+      .spin {
+        width: 9px;
+        height: 9px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .mini-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--faint);
+        margin: 14px 0 4px;
+      }
+      .mini-label code {
+        text-transform: none;
+        letter-spacing: 0;
+      }
+      .truth .row {
+        border-style: dashed;
+        color: var(--muted);
+      }
+      .counters {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 10px;
+      }
+      .counters b {
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* truth table */
+      .tt {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+        margin-top: 12px;
+      }
+      @media (max-width: 860px) {
+        .tt {
+          grid-template-columns: 1fr;
+        }
+      }
+      .tt .opts2 {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin: 6px 0 14px;
+      }
+      .tt .opts2 button {
+        font-size: 0.8rem;
+        padding: 6px 10px;
+      }
+
+      /* clocks */
+      .clocks {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .clocks .card {
+        display: grid;
+        gap: 8px;
+        justify-items: start;
+      }
+      .clocks .ev {
+        font: 0.74rem var(--mono);
+        color: var(--faint);
+        min-height: 1.4em;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="top">
+      <div class="inner">
+        <a href="#intro">Intro</a>
+        <a href="#verbs">Three verbs</a>
+        <a href="#files">What changed</a>
+        <a href="#map">Big picture</a>
+        <a href="#queries">Queries &amp; the cache</a>
+        <a href="#poll">Poll vs push</a>
+        <a href="#ws">WebSockets</a>
+        <a href="#relay">The relay</a>
+        <a href="#signals">Signals, not data</a>
+        <a href="#fail">When it breaks</a>
+        <a href="#stores">Stores outside React</a>
+        <a href="#tradeoffs">Trade-offs</a>
+        <a href="#quiz">Quiz</a>
+      </div>
+      <div id="progress"></div>
+    </nav>
+
+    <!-- ============================================================ INTRO -->
+    <section id="intro" class="hero">
+      <div class="eyebrow">
+        apps/console · part 2 (part 1:
+        <a href="auth-walkthrough.html">login</a>)
+      </div>
+      <h1>How the project page <span class="grad">stays live</span></h1>
+      <p class="lede">
+        You open a project in Console and see its services: running, stopped, deploying. Someone
+        else runs <code>railway up</code> from their laptop, and a second later your page shows it,
+        without a reload. This page explains how, from “what is a GraphQL subscription” up to the
+        specific choices in the code.
+      </p>
+      <p class="muted">
+        Everything is clickable: step through the message flows, poke at the protocol, and break the
+        live connection on purpose to see what the app does.
+      </p>
+
+      <div class="grid g3 cast">
+        <div class="card actor">
+          <div class="icon" style="background: rgba(76, 194, 255, 0.14)">🧑‍💻</div>
+          <div>
+            <h4 class="b">Browser</h4>
+            <p>
+              React components, plus a <b>TanStack Query cache</b> that holds the data they show,
+              and one WebSocket for live updates.
+            </p>
+          </div>
+        </div>
+        <div class="card actor">
+          <div class="icon" style="background: rgba(61, 220, 151, 0.14)">🖥️</div>
+          <div>
+            <h4 class="s">Console server</h4>
+            <p>
+              TanStack Start. <b>Server functions</b> for reads and writes, and a small
+              <b>WebSocket relay</b> at <code>/api/live</code>. Only this box ever holds the Railway
+              token.
+            </p>
+          </div>
+        </div>
+        <div class="card actor">
+          <div class="icon" style="background: rgba(167, 139, 250, 0.14)">🚂</div>
+          <div>
+            <h4 class="r">Railway</h4>
+            <p>
+              A GraphQL API: plain HTTP for questions and commands, WebSockets for “tell me when
+              something changes.”
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tldr">
+        <div class="row">
+          <b class="b">Reading</b>
+          <span
+            >The page asks the server for the project (a <b>query</b>). TanStack Query keeps the
+            answer in a cache under the key <code>["project", projectId]</code>, and every component
+            reads from there.</span
+          >
+        </div>
+        <div class="row">
+          <b class="s">Writing</b>
+          <span
+            >Start/Stop buttons send a <b>mutation</b> through a server function. When it succeeds,
+            the page doesn't edit the cache by hand. It marks the cache entry as out of date
+            (“invalidates” it), which triggers a fresh read.</span
+          >
+        </div>
+        <div class="row">
+          <b class="w">Staying live</b>
+          <span
+            >The browser holds a WebSocket to our relay, which holds WebSockets to Railway. Railway
+            pushes <b>subscription</b> events. Each event is treated as a
+            <em>signal</em> (“something changed”), never as data. The response is always the same:
+            invalidate and read again.</span
+          >
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ VERBS -->
+    <section id="verbs">
+      <div class="eyebrow">Chapter 1</div>
+      <h2>GraphQL's three verbs</h2>
+      <p class="lede">
+        Railway's API is GraphQL. Every request you send it is one of three kinds of
+        <em>operation</em>. The first two are ordinary request/response. The third is different: you
+        ask once, and answers keep coming.
+      </p>
+      <div class="grid g3" style="margin-top: 18px" id="verbs-grid"></div>
+
+      <h3>Why the third one needs a different pipe</h3>
+      <p>
+        A normal HTTP request is a phone call where you ask one question, get one answer, and hang
+        up. A subscription needs the line to <em>stay open</em> so Railway can speak first, any
+        time. That's a <b>WebSocket</b>: a connection that starts as an HTTP request, then gets
+        “upgraded” into a two-way channel that stays open as long as both sides want. Chapters 5 and
+        6 open one up.
+      </p>
+
+      <h3>Words you'll see</h3>
+      <div class="gloss" id="gloss"></div>
+    </section>
+
+    <!-- ============================================================ FILES -->
+    <section id="files">
+      <div class="eyebrow">Chapter 2</div>
+      <h2>Where the code lives</h2>
+      <p class="lede">
+        A project page, the plumbing to read and write through TanStack Query, and a live-update
+        layer. Click a file to see what it does and why.
+      </p>
+      <div class="files" style="margin-top: 18px">
+        <div class="filelist" id="filelist"></div>
+        <div class="card" id="filedetail"></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ MAP -->
+    <section id="map">
+      <div class="eyebrow">Chapter 3</div>
+      <h2>The big picture: three paths</h2>
+      <p class="lede">
+        All data moves along one of three paths. Notice that the
+        <span class="w">live</span> path doesn't bring data with it. It ends by triggering the
+        <span class="b">read</span> path.
+      </p>
+      <div class="tabs" id="maptabs">
+        <button data-route="read" class="on">▶ Read path (query)</button>
+        <button data-route="write">▶ Write path (mutation)</button>
+        <button data-route="live">▶ Live path (subscription)</button>
+      </div>
+      <div class="card bigmap">
+        <svg id="bigmap" viewBox="0 0 1000 450"></svg>
+        <div class="caption" id="mapcap">
+          <span class="muted">Pick a path above to watch a message travel through the system.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ QUERIES -->
+    <section id="queries">
+      <div class="eyebrow">Chapter 4</div>
+      <h2>Queries, server functions, and the cache</h2>
+      <p class="lede">
+        Three tools work together here. <b>Server functions</b> let browser code call code that runs
+        on the server. <b>TanStack Query</b> remembers the results. <b>TanStack Router</b>
+        loads data before a page renders, both on the server and in the browser.
+      </p>
+
+      <div class="grid g2" style="margin-top: 18px">
+        <div>
+          <h3 style="margin-top: 0">1. Describe the query once</h3>
+          <p>
+            <code>projectQuery(projectId)</code> bundles two things: a <b>key</b> (the name of the
+            cache entry) and a <b>function</b> that fetches the data. The loader, the page
+            component, the chat widgets, and the live watcher all pass the same object around, so
+            they all point at the same cache entry.
+          </p>
+          <pre
+            class="code"
+            data-file="railway/project.ts"
+          >export const projectQuery = (projectId: string) =>
+  queryOptions({
+    <mark>queryKey: ["project", projectId],</mark>
+    queryFn: () => getProjectFn({ data: { projectId } }),
+  });</pre>
+        </div>
+        <div>
+          <h3 style="margin-top: 0">2. Load before render, read during render</h3>
+          <p>
+            The route's <code>loader</code> runs <em>before</em> the page renders and fills the
+            cache. The component then uses <code>useSuspenseQuery</code>, which reads that entry and
+            keeps the component subscribed to it, so it re-renders whenever the entry changes.
+          </p>
+          <pre class="code" data-file="routes/projects/$projectId.tsx">
+export const Route = createFileRoute("/projects/$projectId")({
+  loader: ({ context, params }) =>
+    <mark>context.queryClient.ensureQueryData(projectQuery(params.projectId)),</mark>
+  component: ProjectPage,
+});
+
+function ProjectPage() {
+  const query = projectQuery(projectId);
+  const { data: project } = <mark>useSuspenseQuery(query)</mark>;</pre>
+        </div>
+      </div>
+
+      <h3>3. A server function hides the token</h3>
+      <p>
+        <code>getProjectFn</code> is declared with <code>createServerFn</code>. Its body only ever
+        runs on the server. When the browser calls it, TanStack Start sends an HTTP request to the
+        server, runs the body there, and returns the result as JSON. Before the body runs, the
+        <code>requireRailway</code> middleware reads the encrypted session cookie, refreshes the
+        token if needed, and hands the handler a ready-made Railway client.
+      </p>
+      <pre
+        class="code"
+        data-file="railway/require-railway.ts + railway/project.ts"
+      >export const requireRailway = createMiddleware({ type: "function" }).server(async ({ next }) => {
+  const session = await getFreshSession();
+  if (!session) { setResponseStatus(401); throw new Error("Not signed in to Railway"); }
+  return next({ context: { <mark>railway: createRailwayClient(session.accessToken)</mark> } });
+});
+
+const getProjectFn = createServerFn({ method: "GET" })
+  .middleware([requireRailway])
+  .validator(z.object({ projectId: z.string() }))
+  .handler(({ data, context }) => <mark>fetchProject(context.railway, data.projectId)</mark>);
+
+export async function fetchProject(railway: RailwayClient, projectId: string) {
+  const { project } = await railway(ProjectQuery, { id: projectId });
+  return { /* flattened: environments → services → latest deployment */ };
+}</pre>
+
+      <h3>Step through it</h3>
+      <p class="muted">
+        Use <kbd>←</kbd> <kbd>→</kbd> or the buttons, or click any arrow. The three tabs show the
+        same code doing different work depending on where it runs.
+      </p>
+      <div id="player-queries"></div>
+
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: inside the query cache</h3>
+          <span class="muted" style="font-size: 0.85rem"
+            >simulated, but it follows TanStack Query's rules</span
+          >
+        </div>
+        <p class="muted" style="margin-top: 6px">
+          One cache entry, two <em>observers</em> (things that are watching it). Try invalidating
+          it, then switch the live watcher into polling mode.
+        </p>
+        <div class="grid g2" style="margin-top: 10px">
+          <div>
+            <div class="kv" id="cache-kv"></div>
+            <div class="mini-label">Observers of <code>["project", "p1"]</code></div>
+            <div id="cache-obs"></div>
+            <div class="simbar">
+              <button id="cache-inv" class="primary">invalidateQueries()</button>
+              <button id="cache-poll">Live watcher: switch to polling</button>
+              <button id="cache-focus">Tab regains focus</button>
+            </div>
+          </div>
+          <div>
+            <div class="mini-label" style="margin-top: 0">What happened</div>
+            <div class="devtools" id="cache-log" style="height: 250px; overflow-y: auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Why two observers watch the same entry</h3>
+      <p>
+        <code>ProjectPage</code> reads the data with <code>useSuspenseQuery</code>.
+        <code>keepEnvironmentLive</code> isn't a React hook. It runs outside React, and creates its
+        own <code>QueryObserver</code> on the <em>same</em> key. That is what
+        <code>useQuery</code> uses under the hood. The observer does three jobs: it keeps the entry
+        active, so invalidating it refetches. It tells the watcher which deployments are on screen.
+        And it carries an option, <code>refetchInterval</code>, which turns polling on and off.
+        Options like that belong to each observer, while the data lives once in the cache. Both
+        observers share one entry, and one fetch updates both.
+      </p>
+      <pre
+        class="code"
+        data-file="railway/live/environment-live.ts"
+      >const project = <mark>new QueryObserver(queryClient, query)</mark>;
+…
+const mode: LiveMode = canvasAvailable && connection === "connected" ? "live" : "polling";
+project.setOptions({
+  ...query,
+  <mark>refetchInterval: mode === "polling" ? POLL_INTERVAL_MS : false,</mark>
+});</pre>
+    </section>
+
+    <!-- ============================================================ POLL VS PUSH -->
+    <section id="poll">
+      <div class="eyebrow">Chapter 5</div>
+      <h2>Why not just poll?</h2>
+      <p class="lede">
+        The simplest way to stay up to date is to ask again every N seconds. It works, and this app
+        still does it as a fallback. The problem is the trade-off: poll often and you burn requests;
+        poll rarely and the page is out of date.
+      </p>
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: ten minutes of a project</h3>
+          <label class="toggle" style="min-width: 280px">
+            Poll every <b id="poll-v" style="color: var(--text); min-width: 3ch">30 s</b>
+            <input type="range" id="poll-r" min="5" max="120" step="5" value="30" />
+          </label>
+        </div>
+        <p class="muted" style="margin-top: 6px">
+          Purple dots are changes made somewhere else (CLI, dashboard, git push). Lines show how
+          long each change went unnoticed.
+        </p>
+        <div class="timeline"><svg id="poll-svg" viewBox="0 0 900 230"></svg></div>
+        <div class="stats" id="poll-stats"></div>
+        <p class="muted" style="font-size: 0.85rem; margin-top: 12px">
+          Railway's Hobby plan allows about 1,000 API requests per hour (see
+          <code>docs/realtime.md</code>). Each open tab polls on its own. Push-mode delay assumes
+          the measured ~1 s until Railway re-sends the hash, plus the 250 ms debounce and the
+          refetch.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================ WEBSOCKETS -->
+    <section id="ws">
+      <div class="eyebrow">Chapter 6</div>
+      <h2>Subscriptions over a WebSocket</h2>
+      <p class="lede">
+        A WebSocket is just a pipe that carries messages both ways. To run GraphQL subscriptions
+        over it, both ends need to agree on the message format. That agreement is a protocol called
+        <code>graphql-transport-ws</code>, and <code>graphql-ws</code> is the library that speaks
+        it. This app speaks it twice: browser ⇄ relay, and relay ⇄ Railway.
+      </p>
+
+      <div class="grid g2" style="margin-top: 16px">
+        <div class="card">
+          <div class="eyebrow">The whole protocol, roughly</div>
+          <div class="kv" style="margin-top: 10px; grid-template-columns: 170px 1fr">
+            <span class="v b">connection_init</span
+            ><span>“Hi, here are my credentials.” First message after the socket opens.</span>
+            <span class="v s">connection_ack</span><span>“OK, you're in.”</span>
+            <span class="v b">subscribe {id}</span
+            ><span
+              >Start a subscription. The client invents the <code>id</code>, and many subscriptions
+              share one socket.</span
+            >
+            <span class="v s">next {id}</span
+            ><span
+              >One event for subscription <code>id</code>. Arrives whenever the server feels like
+              it.</span
+            >
+            <span class="v s">error {id}</span><span>That subscription failed and is over.</span>
+            <span class="v">complete {id}</span
+            ><span
+              >Either side: “subscription <code>id</code> is done.” The client sends it to
+              unsubscribe.</span
+            >
+            <span class="v">ping / pong</span><span>Keep-alive. Either side can ping.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="eyebrow">Our client, in one call</div>
+          <pre class="code" data-file="railway/live/live-client.ts">client ??= createClient({
+  url: async () => { /* refresh session, then */ return "ws://…/api/live"; },
+  <mark>lazy: true,</mark>                 // no socket until the first subscribe
+  lazyCloseTimeout: 5_000,    // close 5 s after the last one ends
+  <mark>retryAttempts: Number.POSITIVE_INFINITY,</mark>
+  shouldRetry: (error) => !(error instanceof SignedOutError),
+  on: { connecting: …, connected: … },  // feeds the "Live" badge
+});</pre>
+          <p class="muted" style="font-size: 0.88rem; margin: 0">
+            One client for the whole app (the <code>??=</code> creates it once). Every subscription
+            on the page shares this one socket.
+          </p>
+        </div>
+      </div>
+
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: be the browser</h3>
+          <span class="muted" style="font-size: 0.85rem"
+            >you send frames; a simulated relay answers the way
+            <code>live-socket.ts</code> does</span
+          >
+        </div>
+        <div class="proto">
+          <div class="actions" id="proto-actions"></div>
+          <div>
+            <div class="wire-head">
+              <span class="b">↑ browser sends</span><span class="s">relay sends ↓</span>
+            </div>
+            <div class="wire" id="wire"></div>
+            <div class="subs" id="proto-subs"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ RELAY -->
+    <section id="relay">
+      <div class="eyebrow">Chapter 7</div>
+      <h2>The relay: why the browser doesn't talk to Railway</h2>
+      <p class="lede">
+        Railway's WebSocket wants the access token in <code>connection_init</code>. Giving it to
+        browser JavaScript would undo the whole point of the
+        <a href="auth-walkthrough.html#boundary">server boundary</a> from part 1. So the browser
+        connects to <b>our</b> server, which authenticates it with the session cookie and opens its
+        own connection to Railway with the token.
+      </p>
+
+      <div class="boundary" style="margin-top: 18px">
+        <div class="side">
+          <div class="eyebrow b">Browser → relay</div>
+          <div class="chip">
+            <span>Authenticated by</span><small>httpOnly session cookie</small>
+          </div>
+          <div class="chip">
+            <span>Allowed messages</span><small>init · ping · pong · subscribe · complete</small>
+          </div>
+          <div class="chip"><span>Allowed operations</span><small>subscriptions only</small></div>
+          <div class="chip"><span>Sees the token?</span><small class="good">never</small></div>
+        </div>
+        <div class="wall"><div></div></div>
+        <div class="side">
+          <div class="eyebrow r">Relay → Railway (“upstream”)</div>
+          <div class="chip">
+            <span>Authenticated by</span><small>Bearer token in connection_init</small>
+          </div>
+          <div class="chip">
+            <span>Sockets per browser tab</span><small>≤ 2 (public + internal)</small>
+          </div>
+          <div class="chip">
+            <span>Created</span><small>lazily, on the first subscription that needs it</small>
+          </div>
+          <div class="chip">
+            <span>If it drops</span><small>relay closes the browser socket (1012)</small>
+          </div>
+        </div>
+      </div>
+
+      <h3>Step through it</h3>
+      <div id="player-relay"></div>
+
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: what will the relay let through?</h3>
+          <span class="muted" style="font-size: 0.85rem"
+            ><code>endpointFor()</code> in <code>railway/live/live-socket.ts</code></span
+          >
+        </div>
+        <p class="muted" style="margin-top: 6px">
+          Every <code>subscribe</code> is parsed before it goes anywhere. The relay is not a
+          general-purpose proxy: queries and mutations must go through server functions, where the
+          validation lives. Pick an example or type your own GraphQL.
+        </p>
+        <div class="tabs" id="router-presets"></div>
+        <div class="router-lab">
+          <textarea id="router-src" spellcheck="false"></textarea>
+          <div>
+            <div class="kv" id="router-kv"></div>
+            <div class="verdict" id="router-verdict"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ SIGNALS -->
+    <section id="signals">
+      <div class="eyebrow">Chapter 8</div>
+      <h2>Pushes are signals, not data</h2>
+      <p class="lede">
+        This is the key idea of the design. When an event arrives, the app <em>doesn't</em> try to
+        patch the page with what the event says. It asks the server for the full, current project
+        again. There is <b>one writer</b> for the cache (the refetch), so the page can't drift out
+        of sync because of a missed, duplicated, or out-of-order event.
+      </p>
+
+      <div class="grid g2" style="margin-top: 16px">
+        <div class="card">
+          <h4 style="margin: 0 0 4px"><code>canvasInvalidation(environmentId)</code></h4>
+          <p class="muted" style="font-size: 0.9rem">
+            An <b>internal, undocumented</b> Railway subscription that may change without notice.
+            It's what Railway's own dashboard uses. It sends only an <code>id</code>, a hash of the
+            environment's state, and re-sends it every 2 → 4 → 8 s.
+            <b>When the hash changes, something changed</b>, whoever changed it.
+          </p>
+        </div>
+        <div class="card">
+          <h4 style="margin: 0 0 4px"><code>deployment(id)</code></h4>
+          <p class="muted" style="font-size: 0.9rem">
+            Public API. One subscription per deployment currently on screen. It pushes
+            <code>SUCCESS</code>, <code>REMOVING</code>, and <code>REMOVED</code> (measured: not the
+            in-between states). It's a second, independent signal for the deployments you can
+            already see.
+          </p>
+        </div>
+      </div>
+
+      <pre class="code" data-file="railway/live/environment-live.ts">next: (data) => {
+  const parsed = CanvasInvalidation.safeParse(data);   // hand-typed, so validate it
+  if (!parsed.success) return failCanvas();
+  lastPushAt = Date.now();                             // feeds the 30 s watchdog
+  setCanvasAvailable(true);
+  // Railway re-sends the same hash periodically; only a new one means something changed.
+  <mark>if (parsed.data.canvasInvalidation.id === lastHash) return;</mark>
+  lastHash = parsed.data.canvasInvalidation.id;
+  <mark>scheduleRefetch();</mark>                                  // debounced 250 ms → invalidateQueries
+},</pre>
+
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: the live pipeline</h3>
+          <span class="muted" style="font-size: 0.85rem"
+            >simulation. Timings come from <code>docs/realtime.md</code> and the constants in the
+            code</span
+          >
+        </div>
+        <p class="muted" style="margin-top: 6px">
+          Change things “from the CLI” and watch how events flow into refetches, and how the page
+          (left: what the page shows) catches up with Railway (right: the truth). Turn off the
+          safeguards to see why they're there.
+        </p>
+        <div class="simbar">
+          <button id="sim-worker" class="primary">▶ Start worker (from CLI)</button>
+          <button id="sim-api">🚀 Redeploy api</button>
+          <button id="sim-burst">⚡ Burst: 3 pushes in 160 ms</button>
+          <button id="sim-silence">🔇 Make canvasInvalidation go silent</button>
+          <button id="sim-reset">Reset</button>
+        </div>
+        <div class="simbar">
+          <label class="toggle"
+            ><input type="checkbox" id="sim-dedupe" checked /> ignore repeated hashes</label
+          >
+          <label class="toggle"
+            ><input type="checkbox" id="sim-debounce" checked /> debounce 250 ms</label
+          >
+          <span class="seg" id="sim-speed">
+            <button data-s="0.25">¼×</button><button data-s="1" class="on">1×</button
+            ><button data-s="4">4×</button>
+          </span>
+          <button id="sim-pause">⏸ Pause</button>
+        </div>
+        <div class="sim">
+          <div>
+            <svg id="sim-svg" viewBox="0 0 900 270"></svg>
+            <div class="counters" id="sim-counters"></div>
+          </div>
+          <div>
+            <div class="mock" id="sim-mock"></div>
+            <div class="mini-label">What Railway knows right now</div>
+            <div class="mock truth" id="sim-truth"></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Things to notice in the lab</h3>
+      <div class="grid g2">
+        <div class="card">
+          <b>The first hash always refetches.</b>
+          <p class="muted" style="font-size: 0.9rem; margin: 4px 0 0">
+            <code>lastHash</code> starts out <code>undefined</code>, so the first push counts as
+            new. That covers anything that changed between the server render and the moment the
+            subscription started.
+          </p>
+        </div>
+        <div class="card">
+          <b>New deployments get subscribed after a refetch.</b>
+          <p class="muted" style="font-size: 0.9rem; margin: 4px 0 0">
+            The deployments to subscribe to come from the data on screen. Start the worker:
+            <code>canvasInvalidation</code> notices first, the refetch reveals a new deployment ID,
+            and only then does a <code>deployment(id)</code> subscription start for it.
+          </p>
+        </div>
+        <div class="card">
+          <b>Debounce turns a burst into one request.</b>
+          <p class="muted" style="font-size: 0.9rem; margin: 4px 0 0">
+            Each event restarts a 250 ms timer, and the refetch happens once the events stop.
+            Without it, every event would call <code>invalidateQueries</code>, which
+            <em>cancels</em> the fetch already in flight and starts a new one (red bars).
+          </p>
+        </div>
+        <div class="card">
+          <b>Silence is a failure too.</b>
+          <p class="muted" style="font-size: 0.9rem; margin: 4px 0 0">
+            A watchdog checks every 5 s. After 30 s without any hash (even a repeated one), the
+            badge flips to polling. Pushes resuming flips it back. Use 4× speed to watch it happen.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ FAILURES -->
+    <section id="fail">
+      <div class="eyebrow">Chapter 9</div>
+      <h2>When it breaks</h2>
+      <p class="lede">
+        Live connections fail in more ways than requests do: they can drop, go quiet, or be ended by
+        the other side. The rule here is simple. The badge says <b>Live</b> only when both the
+        socket is connected and <code>canvasInvalidation</code> is healthy. Otherwise the page polls
+        every 30 s, so it's never stale for long.
+      </p>
+
+      <div class="lab">
+        <div class="lab-head"><h3>Lab: what does the badge say?</h3></div>
+        <div class="tt">
+          <div>
+            <div class="mini-label" style="margin-top: 0">
+              Connection (<code>getLiveConnection()</code>)
+            </div>
+            <div class="opts2" id="tt-conn"></div>
+            <div class="mini-label">canvasInvalidation stream</div>
+            <div class="opts2" id="tt-canvas"></div>
+          </div>
+          <div>
+            <div style="display: flex; gap: 10px; align-items: center">
+              <b style="font-size: 1.05rem">my-project</b><span id="tt-badge"></span>
+            </div>
+            <div class="verdict" id="tt-why"></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Every failure, and what happens next</h3>
+      <div class="fail-list" id="faillist"></div>
+    </section>
+
+    <!-- ============================================================ STORES -->
+    <section id="stores">
+      <div class="eyebrow">Chapter 10</div>
+      <h2>Small stores outside React</h2>
+      <p class="lede">
+        Three pieces of state live in plain module variables instead of React state: the connection
+        status (one socket for the whole app), the environments being watched, and a shared
+        one-second clock. Plain code like <code>keepEnvironmentLive</code> reads the connection with
+        <code>getLiveConnection()</code> and <code>onLiveConnectionChange()</code>. React reads the
+        other two with <code>useSyncExternalStore</code>, which takes three functions.
+      </p>
+      <div class="grid g2" style="margin-top: 14px">
+        <pre
+          class="code"
+          data-file="railway/live/watch-environment.ts"
+        >const watches = new Map&lt;string, Watch>();   // one per environment, counted
+const listeners = new Set&lt;() => void>();
+
+export function useWatchEnvironment(projectId, environmentId) {
+  const queryClient = useQueryClient();
+  useEffect(() => retainWatch(queryClient, projectId, environmentId), […]);
+
+  return useSyncExternalStore(
+    <mark>subscribeToWatches,</mark>                                          // add a listener
+    <mark>() => watches.get(watchKey(projectId, environmentId))?.status,</mark>  // read it now
+    <mark>() => undefined,</mark>                                             // what the server renders
+  );
+}</pre>
+        <div>
+          <p>
+            <b>subscribe</b>: “call me when it changes.” <b>getSnapshot</b>: “what is it now?”
+            <b>getServerSnapshot</b>: “what should the server-rendered HTML say?”
+          </p>
+          <p>
+            The first watcher of an environment starts <code>keepEnvironmentLive</code> and the last
+            one to unmount stops it. So the project page and a chat widget showing the same
+            environment share one set of subscriptions.
+          </p>
+          <p>
+            The third function matters for hydration. Effects don't run on the server, so nothing is
+            watched there, and the status is <code>undefined</code> (badge:
+            <i>Polling every 30s</i>). The badge switches to <i>Live</i> once the watch starts and
+            the socket connects. The clock's server snapshot is <code>null</code>, so
+            <code>Elapsed</code>
+            renders nothing on the server. The server's clock and the browser's clock would
+            disagree, and React would complain about mismatched HTML.
+          </p>
+        </div>
+      </div>
+
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: why the elapsed timer ticks locally</h3>
+          <button id="clk-go" class="primary">▶ Start a deploy</button>
+        </div>
+        <p class="muted" style="margin-top: 6px">
+          Railway sends deploy progress in bursts: nothing for ~14 s, then several steps at once.
+          Here's a badge that only changes when data arrives, next to one with a local clock.
+        </p>
+        <div class="clocks">
+          <div class="card">
+            <span class="eyebrow">Only re-renders on events</span>
+            <span id="clk-a"></span>
+            <span class="ev" id="clk-a-ev"></span>
+          </div>
+          <div class="card">
+            <span class="eyebrow">Shared local clock (what the code does)</span>
+            <span id="clk-b"></span>
+            <span class="ev" id="clk-b-ev"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ TRADEOFFS -->
+    <section id="tradeoffs">
+      <div class="eyebrow">Chapter 11</div>
+      <h2>Trade-offs and things to know</h2>
+      <div class="grid g2" style="margin-top: 14px" id="tradeoff-grid"></div>
+    </section>
+
+    <!-- ============================================================ QUIZ -->
+    <section id="quiz">
+      <div class="eyebrow">Chapter 12</div>
+      <h2>Check yourself</h2>
+      <div id="quizbox"></div>
+      <p id="quizscore" style="font-weight: 600"></p>
+    </section>
+
+    <footer>
+      Generated from the working tree of <code>apps/console</code>. Measured Railway behaviour comes
+      from <code>docs/realtime.md</code>. The labs are simulations: they follow the code's rules and
+      constants, but they don't talk to Railway.
+    </footer>
+
+    <script>
+      /* ================================================================ helpers */
+      const $ = (s, r = document) => r.querySelector(s);
+      const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"]/g,
+          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+        );
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      // Timers rather than requestAnimationFrame, so animations also run in embedded/background previews.
+      const nextFrame = (f) => setTimeout(() => f(performance.now()), 16);
+      const circled = (n) => String.fromCodePoint(0x2460 + n);
+
+      function highlight(src) {
+        const MO = "\u0001",
+          MC = "\u0002";
+        const out = esc(src.replace(/<mark>/g, MO).replace(/<\/mark>/g, MC));
+        const re =
+          /(\/\/[^\n]*)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`)|\b(import|from|export|const|let|async|await|return|if|else|try|catch|throw|new|function|type|as|null|true|false|typeof|mutation|subscription|for|of|interface)\b|\b(\d[\d_]*)\b|\b([A-Z][A-Za-z0-9]+)\b|\b([a-z_$][\w$]*)(?=\()/g;
+        const cls = ["com", "str", "kw", "num", "ty", "fn"];
+        return out
+          .replace(re, (m, ...g) => {
+            const i = g.slice(0, 6).findIndex((x) => x !== undefined);
+            return i < 0 ? m : `<span class="tk-${cls[i]}">${m}</span>`;
+          })
+          .replaceAll(MO, "<mark>")
+          .replaceAll(MC, "</mark>");
+      }
+      function renderCode(el) {
+        const file = el.dataset.file;
+        const raw =
+          el.dataset.raw ??
+          el.innerHTML.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+        el.dataset.raw = raw;
+        el.innerHTML = (file ? `<span class="file">${esc(file)}</span>` : "") + highlight(raw);
+      }
+      $$("pre.code").forEach(renderCode);
+      function codeBlock(src, file) {
+        const pre = document.createElement("pre");
+        pre.className = "code";
+        if (file) pre.dataset.file = file;
+        pre.dataset.raw = src;
+        renderCode(pre);
+        return pre.outerHTML;
+      }
+
+      /* ================================================================ nav progress */
+      const sections = $$("section");
+      const navLinks = $$("nav.top a");
+      addEventListener(
+        "scroll",
+        () => {
+          const h = document.documentElement;
+          $("#progress").style.width =
+            (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100 + "%";
+          let cur = sections[0].id;
+          for (const s of sections) if (s.getBoundingClientRect().top < 120) cur = s.id;
+          navLinks.forEach((a) =>
+            a.classList.toggle("active", a.getAttribute("href") === "#" + cur),
+          );
+        },
+        { passive: true },
+      );
+
+      /* ================================================================ ch1: verbs */
+      const VERBS = [
+        {
+          key: "query",
+          name: "Query",
+          cls: "b",
+          sub: "Read. “What does this project look like?”",
+          analogy: "Asking a librarian a question.",
+          code: `query Project($id: String!) {
+  project(id: $id) {
+    name
+    environments { … }
+  }
+}`,
+          note: "Used by <code>getProjectFn</code>. One HTTP POST, one JSON answer.",
+        },
+        {
+          key: "mutation",
+          name: "Mutation",
+          cls: "s",
+          sub: "Write. “Deploy this service.”",
+          analogy: "Handing in a form at the counter.",
+          code: `mutation Deploy(
+  $serviceId: String!
+  $environmentId: String!
+) {
+  serviceInstanceDeployV2(…)
+}`,
+          note: "Used by <code>deployService</code>. The answer is just <code>true</code>. Railway accepted the job, nothing more.",
+        },
+        {
+          key: "sub",
+          name: "Subscription",
+          cls: "w",
+          sub: "“Tell me whenever this changes.”",
+          analogy: "Signing up for text alerts.",
+          code: `subscription DeploymentStatus(
+  $id: String!
+) {
+  deployment(id: $id) { id status }
+}`,
+          note: "Used by <code>keepEnvironmentLive</code>. One request, then any number of answers, until someone says stop.",
+        },
+      ];
+      $("#verbs-grid").innerHTML = VERBS.map(
+        (v) => `<div class="card verb" data-v="${v.key}">
+  <h4 class="${v.cls}">${v.name}</h4><p class="sub">${v.sub} <span style="color:var(--faint)">${v.analogy}</span></p>
+  <div class="wire2"><div class="end l"><span class="ico">🧑‍💻</span>you</div><div class="track"></div><div class="end r"><span class="ico">🚂</span>Railway</div><div class="state"></div></div>
+  <div class="btns"></div>
+  ${codeBlock(v.code)}
+  <p class="muted" style="font-size:.86rem;margin:0">${v.note}</p></div>`,
+      ).join("");
+
+      function fly(wire, dir, label, color, dur = 650) {
+        const pk = document.createElement("span");
+        pk.className = "pk";
+        pk.textContent = label;
+        pk.style.background = color;
+        wire.appendChild(pk);
+        const w = wire.clientWidth;
+        const [a, b] = dir > 0 ? [76, w - 76] : [w - 76, 76];
+        const anim = pk.animate(
+          [
+            { left: a + "px", opacity: 0 },
+            { opacity: 1, offset: 0.12 },
+            { opacity: 1, offset: 0.85 },
+            { left: b + "px", opacity: 0 },
+          ],
+          { duration: dur, easing: "ease-in-out" },
+        );
+        return anim.finished.then(() => pk.remove());
+      }
+      (function setupVerbs() {
+        const card = (k) => $(`.verb[data-v="${k}"]`);
+        // query
+        {
+          const c = card("query"),
+            wire = $(".wire2", c),
+            st = $(".state", c);
+          c.querySelector(".btns").innerHTML = `<button class="primary">Ask</button>`;
+          const btn = $("button", c);
+          btn.onclick = async () => {
+            btn.disabled = true;
+            st.textContent = "HTTP POST…";
+            await fly(wire, 1, "query Project", "var(--browser)");
+            await fly(wire, -1, '{ name: "my-app", … }', "var(--railway)");
+            st.textContent = "done. Connection closed.";
+            btn.disabled = false;
+          };
+        }
+        // mutation
+        {
+          const c = card("mutation"),
+            wire = $(".wire2", c),
+            st = $(".state", c);
+          c.querySelector(".btns").innerHTML = `<button class="primary">Deploy</button>`;
+          const btn = $("button", c);
+          let n = 0;
+          btn.onclick = async () => {
+            btn.disabled = true;
+            st.textContent = "HTTP POST…";
+            await fly(wire, 1, "mutation Deploy", "var(--server)");
+            st.textContent = `Railway: deployment #${++n} QUEUED`;
+            await fly(wire, -1, "true", "var(--railway)");
+            btn.disabled = false;
+          };
+        }
+        // subscription
+        {
+          const c = card("sub"),
+            wire = $(".wire2", c),
+            st = $(".state", c),
+            track = $(".track", c);
+          c.querySelector(".btns").innerHTML = `<button class="primary">Subscribe</button>`;
+          const btn = $("button", c);
+          let on = false,
+            timer;
+          const statuses = ["SUCCESS", "REMOVING", "REMOVED", "SUCCESS"];
+          let i = 0;
+          btn.onclick = async () => {
+            btn.disabled = true;
+            if (!on) {
+              st.textContent = "opening WebSocket…";
+              await fly(wire, 1, "subscribe", "var(--ws)");
+              on = true;
+              track.classList.add("open");
+              st.textContent = "connection open, waiting…";
+              btn.textContent = "Unsubscribe";
+              const tick = async () => {
+                if (!on) return;
+                await fly(
+                  wire,
+                  -1,
+                  `next: ${statuses[i++ % statuses.length]}`,
+                  "var(--railway)",
+                  900,
+                );
+                st.textContent = `${i} event${i === 1 ? "" : "s"} so far, still open`;
+                timer = setTimeout(tick, 1400 + Math.random() * 1200);
+              };
+              timer = setTimeout(tick, 900);
+            } else {
+              on = false;
+              clearTimeout(timer);
+              await fly(wire, 1, "complete", "var(--muted)");
+              track.classList.remove("open");
+              st.textContent = "unsubscribed";
+              btn.textContent = "Subscribe";
+              i = 0;
+            }
+            btn.disabled = false;
+          };
+        }
+      })();
+
+      const GLOSS = [
+        [
+          "Server function",
+          "<code>createServerFn(…)</code>. A function you can call from browser code whose body only runs on the server. Start turns the call into an HTTP request for you.",
+        ],
+        [
+          "Middleware",
+          "<code>requireRailway</code>: runs before a server function, and either rejects (401) or adds <code>context.railway</code>.",
+        ],
+        [
+          "Query cache",
+          "TanStack Query's in-memory map: <code>key → { data, status, updatedAt }</code>. Lives in the browser, and per request on the server.",
+        ],
+        [
+          "Query key",
+          '<code>["project", projectId]</code>. The name of a cache entry. Same key, same entry, wherever you use it.',
+        ],
+        [
+          "Invalidate",
+          "Mark a cache entry as out of date. If anything on screen is watching it, refetch right away.",
+        ],
+        [
+          "Hydration",
+          "The browser takes over server-rendered HTML, along with the server's cache, instead of fetching everything again.",
+        ],
+        [
+          "WebSocket",
+          "A long-lived, two-way connection. It starts as an HTTP request with <code>Upgrade: websocket</code>.",
+        ],
+        [
+          "graphql-ws",
+          "The protocol (<code>graphql-transport-ws</code>) and library for GraphQL subscriptions over a WebSocket.",
+        ],
+        [
+          "Relay / upstream",
+          "Our <code>/api/live</code> handler sits between the browser and Railway. “Upstream” is its own socket to Railway.",
+        ],
+        ["Debounce", "Wait until events stop for 250 ms, then act once."],
+        [
+          "Internal API",
+          "Railway's undocumented <code>/graphql/internal</code> endpoint. It may change without notice.",
+        ],
+        [
+          "Signal vs data",
+          "A push that means “go look again,” as opposed to a push you copy straight onto the screen.",
+        ],
+      ];
+      $("#gloss").innerHTML = GLOSS.map(([t, d]) => `<div><b>${t}</b>${d}</div>`).join("");
+
+      /* ================================================================ ch2: files */
+      const FILES = [
+        { group: "Reading & writing (HTTP)" },
+        {
+          path: "routes/projects/$projectId.tsx",
+          title: "The project page",
+          what: "Most of the user-visible feature. The loader fills the cache, the page reads it with <code>useSuspenseQuery</code> and calls <code>useWatchEnvironment</code> to keep it fresh and get the badge's status. Each service row has Start/Stop buttons built on <code>useMutation</code>, plus a status badge with a ticking <code>Elapsed</code> timer.",
+          why: "Environment is picked from <code>?environmentId=</code>, falling back to <code>production</code>, then the first one (<code>pickEnvironment</code>). UI comes from <code>@repo/ui</code> (<code>Item</code>, <code>Badge</code>, <code>Card</code>, <code>Button</code>).",
+          code: `const onSuccess = () =>
+  queryClient.invalidateQueries({ queryKey: projectQuery(projectId).queryKey });
+const deploy = useMutation({
+  mutationFn: () => deployServiceFn({ data: { serviceId: service.id, environmentId } }),
+  onSuccess,
+});`,
+        },
+        {
+          path: "railway/project.ts",
+          title: "The project's data, in one place",
+          what: "Declares the <code>Project</code> GraphQL query, <code>fetchProject</code> (which flattens Railway's connection types into environments → services → latest deployment), the mutations, and the server functions around them (<code>getProjectFn</code>, <code>deployServiceFn</code>, <code>removeDeploymentFn</code>, …). It also exports <code>projectQuery</code>, the one cache entry for a project.",
+          why: "The project page and the chat widgets both read <code>projectQuery</code>, so a start or stop in either one shows up in both.",
+          code: `export const projectQuery = (projectId: string) =>
+  queryOptions({
+    queryKey: ["project", projectId],
+    queryFn: () => getProjectFn({ data: { projectId } }),
+  });`,
+        },
+        {
+          path: "router.tsx",
+          title: "One QueryClient per router",
+          what: "Creates a <code>QueryClient</code> and puts it in the router <b>context</b>, so every loader can reach it. <code>setupRouterSsrQueryIntegration</code> wires the two libraries together: it wraps the app in a <code>QueryClientProvider</code>, and on the server it sends the cache's contents along with the HTML.",
+          why: "<code>getRouter</code> runs once per request on the server and once in the browser, so users never share a cache on the server.",
+          code: `export const getRouter = () => {
+  const queryClient = new QueryClient();
+  const router = createRouter({ routeTree, context: { queryClient } satisfies RouterContext, scrollRestoration: true });
+  setupRouterSsrQueryIntegration({ router, queryClient });
+  return router;
+};`,
+        },
+        {
+          path: "routes/__root.tsx",
+          title: "Typed router context",
+          what: "The root route is created with <code>createRootRouteWithContext&lt;RouterContext&gt;()</code>, so TypeScript knows <code>context.queryClient</code> exists in every loader.",
+          why: "",
+          code: `export const Route = createRootRouteWithContext<RouterContext>()({ … });`,
+        },
+        {
+          path: "railway/require-railway.ts",
+          title: "Signed-in-only middleware",
+          what: "Server-function middleware: get a fresh session (refreshing the token if under a minute is left), or answer 401. On success it adds <code>context.railway</code>, a typed GraphQL client using the user's token.",
+          why: "Every server function that talks to Railway needs the same check, so it's written once.",
+          code: `export const requireRailway = createMiddleware({ type: "function" }).server(async ({ next }) => {
+  const session = await getFreshSession();
+  if (!session) { setResponseStatus(401); throw new Error("Not signed in to Railway"); }
+  return next({ context: { railway: createRailwayClient(session.accessToken) } });
+});`,
+        },
+        {
+          path: "routes/index.tsx",
+          title: "Projects are links",
+          what: "Each project on the home page links to <code>/projects/$projectId</code>. The home page itself uses plain loader data (<code>getViewer</code>) and doesn't use TanStack Query.",
+          why: "",
+          code: `<Item render={<Link to="/projects/$projectId" params={{ projectId: project.id }} />}>
+  <ItemContent><ItemTitle>{project.name}</ItemTitle></ItemContent>
+</Item>`,
+        },
+        { group: "Live updates (WebSocket)" },
+        {
+          path: "railway/live/environment-live.ts",
+          title: "keepEnvironmentLive: the brain",
+          what: "A plain function, not a hook: given a <code>QueryClient</code>, a project and an environment, it keeps <code>projectQuery</code> fresh until you call the function it returns. It subscribes to <code>canvasInvalidation</code> and to <code>deployment(id)</code> for each visible deployment. Every event leads to a debounced <code>invalidateQueries</code>. It runs a watchdog for silence, and switches its <code>QueryObserver</code> to polling when live isn't available. It reports <code>{ mode, connection }</code> through a callback.",
+          why: "Chapters 8 and 9 are about this file. Running outside React means no component has to stay mounted just to hold subscriptions.",
+          code: `const mode: LiveMode = canvasAvailable && connection === "connected" ? "live" : "polling";
+if (status?.mode !== mode) {
+  project.setOptions({ ...query, refetchInterval: mode === "polling" ? POLL_INTERVAL_MS : false });
+}
+status = { mode, connection };
+onStatus(status);`,
+        },
+        {
+          path: "railway/live/watch-environment.ts",
+          title: "useWatchEnvironment: one watch per environment",
+          what: "The hook components call. It keeps a counted watch per environment: the first watcher starts <code>keepEnvironmentLive</code>, the last one to unmount stops it. It returns the environment's <code>LiveStatus</code> through <code>useSyncExternalStore</code> (Chapter 10).",
+          why: "The project page and chat widgets can show the same environment at once. Without the count, each would open its own subscriptions and fire its own refetches.",
+          code: `function retainWatch(queryClient, projectId, environmentId) {
+  const watch = watches.get(key) ?? startWatch(queryClient, projectId, environmentId, key);
+  watch.count += 1;
+  return () => {
+    watch.count -= 1;
+    if (watch.count > 0) return;
+    watch.stop();
+    watches.delete(key);
+    notify();
+  };
+}`,
+        },
+        {
+          path: "railway/live/live-client.ts",
+          title: "The browser's one socket",
+          what: "A lazily created, app-wide <code>graphql-ws</code> client pointed at <code>/api/live</code>. Before every connection attempt it calls the <code>ensureLiveSession</code> server function so the cookie holds a fresh token. It exposes connection state (<code>getLiveConnection</code>, <code>onLiveConnectionChange</code>), a reconnect listener (<code>onReconnected</code>), and <code>subscribe</code>/<code>subscribeRaw</code>, which <b>resubscribe when Railway ends a subscription</b>.",
+          why: "Railway ends <code>canvasInvalidation</code> after ~95 s (measured). Without resubscribing, tabs would quietly stop noticing changes while still saying “Live.”",
+          code: `complete: () => {
+  if (stopped) return;   // graphql-ws also calls this after our own unsubscribe
+  const lifetime = Date.now() - startedAt;
+  resubscribeTimer = setTimeout(start, lifetime < MIN_HEALTHY_LIFETIME_MS ? RESUBSCRIBE_BACKOFF_MS : 0);
+},`,
+        },
+        {
+          path: "railway/live/live-socket.ts",
+          title: "The relay at /api/live",
+          what: "A Nitro WebSocket handler speaking <code>graphql-transport-ws</code> to the browser, and through its own <code>graphql-ws</code> clients to Railway. It authenticates the upgrade with the session cookie, validates every message with Zod, only lets single subscription operations through, routes internal-only fields to the internal endpoint, and closes with 1012 shortly before the token expires.",
+          why: "The browser must never hold the Railway token (Chapter 7).",
+          code: `async upgrade(request) {
+  const session = await readSessionFromRequest(request);
+  if (!session || session.accessTokenExpiresAt - Date.now() < TOKEN_EXPIRY_MARGIN_MS) {
+    throw new Response("Unauthorized", { status: 401 });
+  }
+  return { protocol: "graphql-transport-ws", context: { accessToken: session.accessToken, … } };
+},`,
+        },
+        {
+          path: "server/session.ts",
+          title: "Read the session from a raw Request",
+          what: "Has <code>readSessionFromRequest(request)</code> next to <code>readSession()</code>. Both use the shared <code>decryptSession</code>.",
+          why: "<code>getCookie()</code> only works inside TanStack Start's request handling. The WebSocket upgrade is handled by Nitro directly, so it parses the <code>Cookie</code> header itself.",
+          code: `export async function readSessionFromRequest(request: Request): Promise<Session | null> {
+  const cookies = request.headers.get("cookie")?.split(/;\\s*/) ?? [];
+  const cookie = cookies.find((c) => c.startsWith(\`\${SESSION_COOKIE}=\`));
+  return decryptSession(cookie && decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1)));
+}`,
+        },
+        {
+          path: "vite.config.ts",
+          full: "apps/console/vite.config.ts",
+          title: "Turn on WebSockets",
+          what: "Enables Nitro's WebSocket support and mounts the relay at <code>/api/live</code>.",
+          why: "",
+          code: `nitro({
+  features: { websocket: true },
+  handlers: [{ route: "/api/live", handler: "./src/railway/live/live-socket.ts" }],
+}),`,
+        },
+        { group: "Plumbing & docs" },
+        {
+          path: "package.json",
+          full: "apps/console/package.json",
+          title: "Dependencies",
+          what: "<b>@tanstack/react-query</b> (the cache), <b>@tanstack/react-router-ssr-query</b> (router ↔ query SSR glue), <b>graphql-ws</b> (client on both sides of the relay).",
+          why: "",
+          code: `"@tanstack/react-query": "^5.104.4",
+"@tanstack/react-router-ssr-query": "^1.167.3",
+"graphql-ws": "^6.4.1",`,
+        },
+        {
+          path: "docs/realtime.md",
+          full: "docs/realtime.md",
+          title: "Research notes",
+          what: "What Railway's subscriptions actually do (measured), how Railway's own dashboard stays live, and the decisions behind this design. It also sketches a later phase where pushes with payloads go through a reducer instead of a refetch.",
+          why: "The timings in this walkthrough's labs come from here.",
+          code: "",
+        },
+      ];
+      let fileIdx = 1;
+      function renderFiles() {
+        $("#filelist").innerHTML = FILES.map((f, i) =>
+          f.group
+            ? `<div class="group">${f.group}</div>`
+            : `<button data-i="${i}" class="${i === fileIdx ? "on" : ""}"><span>${f.path}</span>${f.tag ? `<span class="tag ${f.tag}">${f.tag === "new" ? "new" : "modified"}</span>` : ""}</button>`,
+        ).join("");
+        const f = FILES[fileIdx];
+        $("#filedetail").innerHTML = `<div class="fade-in">
+    <div class="eyebrow">${f.full ?? "apps/console/src/" + f.path}</div>
+    <h3 style="margin:6px 0 8px;font-size:1.35rem">${f.title}</h3>
+    <p>${f.what}</p>${f.why ? `<p class="muted"><b>Why:</b> ${f.why}</p>` : ""}
+    ${f.code ? codeBlock(f.code) : ""}</div>`;
+        $$("#filelist button").forEach(
+          (b) =>
+            (b.onclick = () => {
+              fileIdx = +b.dataset.i;
+              renderFiles();
+            }),
+        );
+      }
+      renderFiles();
+
+      /* ================================================================ ch3: big map */
+      (function bigMap() {
+        const svg = $("#bigmap");
+        const C = { b: "var(--browser)", s: "var(--server)", r: "var(--railway)", w: "var(--ws)" };
+        const BOX = {
+          comp: [30, 40, 280, 84, "React components", "ProjectPage · ServiceRow", C.b],
+          cache: [30, 182, 280, 84, "TanStack Query cache", '["project", id] → data', C.b],
+          live: [30, 340, 280, 84, "live-client.ts", "one graphql-ws socket", C.b],
+          fns: [370, 104, 260, 124, "Server functions", "getProjectFn · deployServiceFn …", C.s],
+          relay: [370, 340, 260, 84, "/api/live relay", "live-socket.ts", C.s],
+          http: [690, 124, 280, 84, "HTTP /graphql/v2", "queries + mutations", C.r],
+          wsp: [690, 300, 280, 58, "WS /graphql/v2", "deployment(id)", C.r],
+          wsi: [690, 372, 280, 58, "WS /graphql/internal", "canvasInvalidation", C.r],
+        };
+        const P = {
+          comp_b: [170, 124],
+          cache_t: [170, 182],
+          cache_b: [170, 266],
+          live_t: [170, 340],
+          comp_r: [310, 92],
+          fns_l1: [370, 140],
+          cache_r: [310, 224],
+          fns_l2: [370, 196],
+          fns_r: [630, 166],
+          http_l: [690, 166],
+          live_r: [310, 382],
+          relay_l: [370, 382],
+          relay_r1: [630, 370],
+          wsp_l: [690, 329],
+          relay_r2: [630, 396],
+          wsi_l: [690, 401],
+        };
+        const CONN = [
+          ["comp_b", "cache_t"],
+          ["cache_b", "live_t"],
+          ["comp_r", "fns_l1"],
+          ["cache_r", "fns_l2"],
+          ["fns_r", "http_l"],
+          ["live_r", "relay_l"],
+          ["relay_r1", "wsp_l"],
+          ["relay_r2", "wsi_l"],
+        ];
+        const READ = [
+          [
+            "comp_b",
+            "cache_t",
+            "comp",
+            "cache",
+            C.b,
+            '<b>useSuspenseQuery</b> asks the cache for <code>["project", id]</code>.',
+          ],
+          [
+            "cache_r",
+            "fns_l2",
+            "cache",
+            "fns",
+            C.b,
+            "Missing or stale, so the cache runs the <b>queryFn</b>: <code>getProjectFn()</code>, an HTTP call to the server.",
+          ],
+          [
+            "fns_r",
+            "http_l",
+            "fns",
+            "http",
+            C.s,
+            "<code>requireRailway</code> attaches the user's token; the handler POSTs <code>query Project</code> to Railway.",
+          ],
+          ["http_l", "fns_r", "http", "fns", C.r, "Railway answers with nested GraphQL JSON."],
+          [
+            "fns_l2",
+            "cache_r",
+            "fns",
+            "cache",
+            C.s,
+            "The handler flattens it (environments → services → latest deployment) and returns JSON. The cache stores it under the key.",
+          ],
+          [
+            "cache_t",
+            "comp_b",
+            "cache",
+            "comp",
+            C.b,
+            "Every component watching that key re-renders with the new data. <b>Done.</b>",
+          ],
+        ];
+        const ROUTES = {
+          read: READ,
+          write: [
+            [
+              "comp_r",
+              "fns_l1",
+              "comp",
+              "fns",
+              C.b,
+              "Click <b>Start</b>: <code>deploy.mutate()</code> calls the <code>deployService</code> server function.",
+            ],
+            [
+              "fns_r",
+              "http_l",
+              "fns",
+              "http",
+              C.s,
+              "<code>mutation Deploy</code>, with the user's token.",
+            ],
+            [
+              "http_l",
+              "fns_r",
+              "http",
+              "fns",
+              C.r,
+              "Railway replies <code>true</code>. That means “accepted,” not “here's the new state.”",
+            ],
+            [
+              "fns_l1",
+              "comp_r",
+              "fns",
+              "comp",
+              C.s,
+              "The server function resolves, and <code>onSuccess</code> runs in the browser.",
+            ],
+            [
+              "comp_b",
+              "cache_t",
+              "comp",
+              "cache",
+              C.b,
+              '<code>invalidateQueries(["project", id])</code>: the entry is now stale, and since the page is watching it…',
+            ],
+            ...READ.slice(1),
+          ],
+          live: [
+            [
+              "wsi_l",
+              "relay_r2",
+              "wsi",
+              "relay",
+              C.r,
+              'Someone deployed from the CLI. Railway pushes <code>next: { canvasInvalidation: { id: "a1f…" } }</code> on the relay\'s upstream socket.',
+            ],
+            [
+              "relay_l",
+              "live_r",
+              "relay",
+              "live",
+              C.w,
+              "The relay forwards the frame to the browser, tagged with the browser's subscription id. No token involved.",
+            ],
+            [
+              "live_t",
+              "cache_b",
+              "live",
+              "cache",
+              C.b,
+              "The hash is new, so <code>keepEnvironmentLive</code> waits 250 ms for more events, then calls <code>invalidateQueries</code>. <b>The push carried no data</b>, so…",
+            ],
+            ...READ.slice(1),
+          ],
+        };
+        let s = `<text class="col" x="170" y="22" text-anchor="middle" fill="${C.b}">Browser</text>
+          <text class="col" x="500" y="22" text-anchor="middle" fill="${C.s}">Console server</text>
+          <text class="col" x="830" y="22" text-anchor="middle" fill="${C.r}">Railway</text>`;
+        for (const [a, b] of CONN)
+          s += `<line class="conn" data-c="${a}|${b}" x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[b][0]}" y2="${P[b][1]}"/>`;
+        for (const [k, [x, y, w, h, t1, t2, col]] of Object.entries(BOX))
+          s += `<g class="box" data-b="${k}" style="color:${col}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12"/>
+            <text x="${x + w / 2}" y="${y + h / 2 - 3}" text-anchor="middle">${t1}</text>
+            <text class="small" x="${x + w / 2}" y="${y + h / 2 + 17}" text-anchor="middle">${esc(t2)}</text></g>`;
+        s += `<circle id="map-pk" r="8" cx="-20" cy="-20" class="packet"/>`;
+        svg.innerHTML = s;
+        const pk = $("#map-pk");
+        let token = 0;
+        async function play(name) {
+          const my = ++token;
+          const steps = ROUTES[name];
+          for (let i = 0; i < steps.length; i++) {
+            if (my !== token) return;
+            const [a, b, ba, bb, col, cap] = steps[i];
+            $$(".bigmap .box").forEach((g) =>
+              g.classList.toggle("hot", g.dataset.b === ba || g.dataset.b === bb),
+            );
+            $$(".bigmap .conn").forEach((l) => {
+              const on = l.dataset.c === `${a}|${b}` || l.dataset.c === `${b}|${a}`;
+              l.classList.toggle("hot", on);
+              l.style.color = on ? col : "";
+            });
+            $("#mapcap").innerHTML = `<span class="pill">${i + 1} / ${steps.length}</span> ${cap}`;
+            pk.setAttribute("fill", col);
+            pk.style.color = col;
+            const [x1, y1] = P[a],
+              [x2, y2] = P[b];
+            const t0 = performance.now(),
+              dur = 900;
+            await new Promise((res) => {
+              const f = (now) => {
+                if (my !== token) return res();
+                const p = Math.min(1, (now - t0) / dur),
+                  e = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
+                pk.setAttribute("cx", x1 + (x2 - x1) * e);
+                pk.setAttribute("cy", y1 + (y2 - y1) * e);
+                p < 1 ? nextFrame(f) : res();
+              };
+              nextFrame(f);
+            });
+            await sleep(1500);
+          }
+          if (my === token) pk.setAttribute("cx", -20);
+        }
+        $$("#maptabs button").forEach(
+          (b) =>
+            (b.onclick = () => {
+              $$("#maptabs button").forEach((x) => x.classList.toggle("on", x === b));
+              play(b.dataset.route);
+            }),
+        );
+      })();
+
+      /* ================================================================ sequence players */
+      const LANE = { B: 120, S: 400, R: 680 };
+      const LCOLOR = { B: "var(--browser)", S: "var(--server)", R: "var(--railway)" };
+      const players = [];
+      function makePlayer(root, { flows, tabs, lanes, legend }) {
+        root.innerHTML = `
+  <div class="tabs">${tabs.map(([k, label], i) => `<button data-flow="${k}" class="${i ? "" : "on"}">${label}</button>`).join("")}</div>
+  <div class="player">
+    <div>
+      <div class="stage">
+        <div class="stage-scroll">
+          <div class="lanes-head">${lanes.map(([cls, name, sub]) => `<div class="${cls}">${name}<small>${sub}</small></div>`).join("")}</div>
+          <svg viewBox="0 0 800 400" preserveAspectRatio="xMidYMin meet"></svg>
+        </div>
+        <div class="controls">
+          <button data-act="prev">← Back</button>
+          <button data-act="next" class="primary">Next →</button>
+          <button data-act="play">▶ Play</button>
+          <button data-act="reset">Restart</button>
+          <span class="count"></span>
+        </div>
+      </div>
+      <div class="legend">${legend}</div>
+    </div>
+    <div class="card detail"></div>
+  </div>`;
+        const svg = $("svg", root),
+          box = $(".stage-scroll", root),
+          detail = $(".detail", root);
+        const btn = (a) => $(`[data-act="${a}"]`, root);
+        let flow = tabs[0][0],
+          step = 0,
+          playing = null;
+        const ROW = 52,
+          TOP = 34;
+        const chName = {
+          http: "HTTP request / response",
+          ws: "WebSocket frame",
+          local: "work inside one box",
+        };
+
+        function draw() {
+          const steps = flows[flow];
+          const H = TOP + steps.length * ROW + 30;
+          svg.setAttribute("viewBox", `0 0 800 ${H}`);
+          let s = "";
+          for (const [k, x] of Object.entries(LANE))
+            s += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="${LCOLOR[k]}" stroke-opacity=".28" stroke-width="2" stroke-dasharray="2 6"/>`;
+          steps.forEach((st, i) => {
+            const y = TOP + i * ROW + 14;
+            const x1 = LANE[st.from],
+              x2 = LANE[st.to];
+            const stroke = st.ch === "ws" ? "var(--ws)" : LCOLOR[st.from];
+            const dash = st.ch === "ws" ? "8 5" : st.ch === "local" ? "2 4" : "";
+            const cls = i < step ? "past" : i === step ? "current" : "future";
+            let path,
+              len,
+              lx,
+              anchor = "middle";
+            if (st.from === st.to) {
+              path = `M ${x1} ${y - 8} h 46 v 18 h -46`;
+              len = 110;
+              lx = x1 + 56;
+              anchor = "start";
+              if (x1 === LANE.R) {
+                path = `M ${x1} ${y - 8} h -46 v 18 h 46`;
+                lx = x1 - 56;
+                anchor = "end";
+              }
+            } else {
+              path = `M ${x1} ${y} L ${x2} ${y}`;
+              len = Math.abs(x2 - x1);
+              lx = (x1 + x2) / 2;
+            }
+            const dir = Math.sign(x2 - x1);
+            const ah =
+              st.from !== st.to
+                ? `${x2},${y} ${x2 - 9 * dir},${y - 5} ${x2 - 9 * dir},${y + 5}`
+                : x1 === LANE.R
+                  ? `${x1},${y + 10} ${x1 - 9},${y + 5} ${x1 - 9},${y + 15}`
+                  : `${x1},${y + 10} ${x1 + 9},${y + 5} ${x1 + 9},${y + 15}`;
+            s += `<g class="msg ${cls}" data-i="${i}" style="--len:${len}">
+      <rect x="0" y="${y - 22}" width="800" height="${ROW}" fill="transparent"/>
+      <path class="${dash ? "" : "draw"}" d="${path}" fill="none" stroke="${stroke}" stroke-width="2" ${dash ? `stroke-dasharray="${dash}"` : ""}/>
+      <polygon points="${ah}" fill="${stroke}"/>
+      <text x="${lx}" y="${st.from === st.to ? y + 5 : y - 7}" text-anchor="${anchor}">${esc(st.label)}</text>
+      <circle cx="${x1}" cy="${st.from === st.to ? y - 8 : y}" r="10" fill="${stroke}"/>
+      <text class="num" x="${x1}" y="${(st.from === st.to ? y - 8 : y) + 3.5}" text-anchor="middle">${i + 1}</text>
+    </g>`;
+          });
+          const cur = steps[step];
+          if (cur.from !== cur.to) {
+            const y = TOP + step * ROW + 14;
+            const c = cur.ch === "ws" ? "var(--ws)" : LCOLOR[cur.from];
+            s += `<circle class="packet" r="5" cx="${LANE[cur.from]}" cy="${y}" fill="${c}" style="color:${c}">
+      <animate attributeName="cx" from="${LANE[cur.from]}" to="${LANE[cur.to]}" dur="0.7s" begin="indefinite" fill="freeze"/>
+      <animate attributeName="opacity" values="1;1;0" keyTimes="0;.85;1" dur="0.9s" begin="indefinite" fill="freeze"/></circle>`;
+          }
+          svg.innerHTML = s;
+          $$("animate", svg).forEach((a) => a.beginElement());
+          $$(".msg", svg).forEach(
+            (g) =>
+              (g.onclick = () => {
+                stop();
+                go(+g.dataset.i);
+              }),
+          );
+          const scale = svg.getBoundingClientRect().width / 800;
+          const yPx = (TOP + step * ROW) * scale + 60;
+          if (yPx < box.scrollTop + 60 || yPx > box.scrollTop + box.clientHeight - 60)
+            box.scrollTop = yPx - box.clientHeight / 2;
+          detail.innerHTML = `<div class="fade-in">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="pill">Step ${circled(step)}</span><span class="channel ${cur.ch}">${chName[cur.ch]}</span></div>
+    <div class="step-title">${cur.title}</div>
+    <p>${cur.text}</p>
+    ${cur.code ? codeBlock(cur.code, cur.file) : ""}
+    ${cur.env ? `<div class="eyebrow" style="margin-top:12px">On the wire</div><div class="envelope">${cur.env}</div>` : ""}
+  </div>`;
+          $(".count", root).textContent = `${step + 1} / ${steps.length}`;
+          btn("prev").disabled = step === 0;
+          btn("next").disabled = step === steps.length - 1;
+        }
+        const go = (i) => {
+          step = Math.max(0, Math.min(flows[flow].length - 1, i));
+          draw();
+        };
+        function stop() {
+          clearInterval(playing);
+          playing = null;
+          btn("play").textContent = "▶ Play";
+        }
+        btn("next").onclick = () => {
+          stop();
+          go(step + 1);
+        };
+        btn("prev").onclick = () => {
+          stop();
+          go(step - 1);
+        };
+        btn("reset").onclick = () => {
+          stop();
+          go(0);
+        };
+        btn("play").onclick = () => {
+          if (playing) return stop();
+          if (step === flows[flow].length - 1) go(0);
+          btn("play").textContent = "⏸ Pause";
+          playing = setInterval(
+            () => (step >= flows[flow].length - 1 ? stop() : go(step + 1)),
+            3400,
+          );
+        };
+        $$(".tabs button", root).forEach(
+          (b) =>
+            (b.onclick = () => {
+              stop();
+              $$(".tabs button", root).forEach((x) => x.classList.toggle("on", x === b));
+              flow = b.dataset.flow;
+              step = 0;
+              draw();
+            }),
+        );
+        draw();
+        addEventListener("resize", draw);
+        players.push({
+          root,
+          next: () => {
+            stop();
+            go(step + 1);
+          },
+          prev: () => {
+            stop();
+            go(step - 1);
+          },
+        });
+      }
+      addEventListener("keydown", (e) => {
+        if (e.target.matches("input, textarea")) return;
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        const p = players.find((p) => {
+          const r = p.root.getBoundingClientRect();
+          return r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.3;
+        });
+        if (!p) return;
+        e.key === "ArrowRight" ? p.next() : p.prev();
+        e.preventDefault();
+      });
+
+      const HTTP_LEGEND = `<span><i style="border-color: var(--browser)"></i>HTTP request / response</span>
+        <span><i style="border-color: var(--server); border-top-style: dotted"></i>work inside one box</span>`;
+
+      makePlayer($("#player-queries"), {
+        tabs: [
+          ["ssr", "① First visit (server render)"],
+          ["nav", "② Clicking a link (in the browser)"],
+          ["mut", "③ Pressing Start (mutation)"],
+        ],
+        lanes: [
+          ["b", "🧑‍💻 Browser", "React + query cache"],
+          ["s", "🖥️ Console server", "server functions"],
+          ["r", "🚂 Railway", "GraphQL over HTTP"],
+        ],
+        legend: HTTP_LEGEND,
+        flows: {
+          ssr: [
+            {
+              from: "B",
+              to: "S",
+              ch: "http",
+              label: "GET /projects/p1",
+              title: "You open a project page",
+              text: "A full page load, so the server does the first render. <code>getRouter()</code> runs for this request and creates a <b>brand-new, empty</b> <code>QueryClient</code> that only this request will use.",
+              code: `// One QueryClient per router: per request on the server, once in the browser.\nconst queryClient = new QueryClient();`,
+              file: "router.tsx",
+            },
+            {
+              from: "S",
+              to: "S",
+              ch: "local",
+              label: "loader: ensureQueryData",
+              title: "The loader runs before rendering",
+              text: "<code>ensureQueryData</code> means “return the cached data if there is any, otherwise fetch it and wait.” The cache is empty, so it runs the <code>queryFn</code>.",
+              code: `loader: ({ context, params }) =>\n  context.queryClient.ensureQueryData(projectQuery(params.projectId)),`,
+            },
+            {
+              from: "S",
+              to: "S",
+              ch: "local",
+              label: "getProjectFn() → requireRailway",
+              title: "On the server, a server function is just a function",
+              text: "We're already on the server, so calling <code>getProjectFn</code> doesn't make an HTTP request. The middleware still runs: decrypt the session cookie, refresh the token if it's about to expire, and build <code>context.railway</code>.",
+            },
+            {
+              from: "S",
+              to: "R",
+              ch: "http",
+              label: "POST /graphql/v2 · query Project",
+              title: "Ask Railway",
+              text: "One request fetches the project, every environment, every service in it, and each service's latest deployment. GraphQL lets you ask for the whole tree at once.",
+              env: `<span class="h">POST /graphql/v2</span>\nAuthorization: Bearer <span class="sec">eyJhbGciOi…</span>\n\n{ "query": "query Project($id: String!) { project(id: $id) { … } }",\n  "variables": { "id": "p1" } }`,
+            },
+            {
+              from: "R",
+              to: "S",
+              ch: "http",
+              label: "{ data: { project: … } }",
+              title: "Railway answers, and the handler reshapes it",
+              text: 'GraphQL\'s <code>edges { node { … } }</code> wrapping is flattened into plain arrays, so components don\'t need to know about it. The result is stored in the cache under <code>["project", "p1"]</code>.',
+              code: `environments: project.environments.edges.map(({ node: environment }) => ({\n  id: environment.id,\n  name: environment.name,\n  services: environment.serviceInstances.edges.map(({ node: instance }) => ({ … })),\n})),`,
+            },
+            {
+              from: "S",
+              to: "S",
+              ch: "local",
+              label: "render + dehydrate the cache",
+              title: "Render, then pack the cache",
+              text: "React renders <code>ProjectPage</code>. <code>useSuspenseQuery</code> finds the data already in the cache, so it doesn't wait. The SSR integration then <b>dehydrates</b> the cache: it serializes the entries so they can ship inside the HTML.",
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "http",
+              label: "200 · HTML + cache payload",
+              title: "Ready-to-show HTML",
+              text: "The browser can paint the page immediately. Hidden inside it is the serialized cache entry. The Railway token is not in there: only the reshaped project data ever leaves the server.",
+              env: `<span class="h">HTTP/1.1 200 OK</span>\n&lt;main&gt;…my-project… api · Running … worker · Stopped…&lt;/main&gt;\n&lt;script&gt;/* dehydrated: ["project","p1"] → { id, name, environments: […] } */&lt;/script&gt;`,
+            },
+            {
+              from: "B",
+              to: "B",
+              ch: "local",
+              label: "hydrate: cache filled, no fetch",
+              title: "Hydration",
+              text: "The browser creates <b>its own</b> <code>QueryClient</code> (once, for the life of the tab) and fills it from the payload. React attaches to the existing HTML. When <code>useSuspenseQuery</code> runs in the browser, the data is already there. Then the effect in <code>useWatchEnvironment</code> starts <code>keepEnvironmentLive</code>, and the live connection opens (Chapter 7).",
+            },
+          ],
+          nav: [
+            {
+              from: "B",
+              to: "B",
+              ch: "local",
+              label: "<Link> click",
+              title: "Client-side navigation",
+              text: "Clicking a <code>&lt;Link&gt;</code> doesn't reload the page. The router runs the next route's loader <b>in the browser</b>.",
+              code: `<Link to="/projects/$projectId" params={{ projectId: project.id }}>…</Link>`,
+            },
+            {
+              from: "B",
+              to: "B",
+              ch: "local",
+              label: "ensureQueryData → cache miss",
+              title: "Same loader, different place",
+              text: "Same <code>ensureQueryData</code> call. If you'd visited this project before in this tab, it would return instantly from the cache. This time it's a miss.",
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "http",
+              label: "GET /_serverFn/… (getProjectFn)",
+              title: "In the browser, a server function is an HTTP call",
+              text: "The build replaces <code>getProjectFn</code>'s body with a small stub that sends the arguments to the server. The browser bundle never contains the handler, the middleware, or anything that touches the token. The session cookie goes along automatically (same origin).",
+              env: `<span class="h">GET /_serverFn/&lt;function-id&gt;?payload=…{"projectId":"p2"}…</span>\nCookie: railway_session=<span class="sec">eyJhbGciOiJkaXIi…</span>`,
+            },
+            {
+              from: "S",
+              to: "S",
+              ch: "local",
+              label: "requireRailway: decrypt, maybe refresh",
+              title: "Middleware runs again",
+              text: "Same as before. If the access token has under a minute left, it's refreshed here, and the response carries a new <code>Set-Cookie</code>.",
+            },
+            {
+              from: "S",
+              to: "R",
+              ch: "http",
+              label: "query Project",
+              title: "Ask Railway",
+              text: "Identical to the server-render case.",
+            },
+            {
+              from: "R",
+              to: "S",
+              ch: "http",
+              label: "{ data }",
+              title: "Answer",
+              text: "Reshaped by the same handler.",
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "http",
+              label: "200 · JSON",
+              title: "Plain JSON back to the browser",
+              text: "The stub resolves with the handler's return value, already typed: TypeScript knows the shape because it's inferred from the handler.",
+            },
+            {
+              from: "B",
+              to: "B",
+              ch: "local",
+              label: "cache.set → render",
+              title: "Into the cache, onto the screen",
+              text: 'The entry <code>["project", "p2"]</code> now exists. The page renders. The previous project\'s entry is still in the cache, so going back is instant.',
+            },
+          ],
+          mut: [
+            {
+              from: "B",
+              to: "B",
+              ch: "local",
+              label: "deploy.mutate()",
+              title: "Click Start",
+              text: "<code>useMutation</code> tracks the request's state. While <code>isPending</code> is true, the button is disabled.",
+              code: `const deploy = useMutation({\n  mutationFn: () => deployService({ data: { serviceId: service.id, environmentId } }),\n  onSuccess,\n});`,
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "http",
+              label: "POST /_serverFn/… (deployService)",
+              title: "POST, because it changes something",
+              text: "Before the handler runs, the server checks the input with the zod <code>validator</code> (the browser can send anything) and runs <code>requireRailway</code>.",
+              code: `const deployService = createServerFn({ method: "POST" })\n  .middleware([requireRailway])\n  .validator(z.object({ serviceId: z.string(), environmentId: z.string() }))\n  .handler(async ({ data, context }) => { await context.railway(DeployMutation, data); });`,
+            },
+            {
+              from: "S",
+              to: "R",
+              ch: "http",
+              label: "mutation Deploy",
+              title: "Tell Railway",
+              text: "",
+              env: `<span class="h">POST /graphql/v2</span>\nAuthorization: Bearer <span class="sec">eyJhbGciOi…</span>\n\n{ "query": "mutation Deploy($serviceId: String!, $environmentId: String!) {\n    serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId) }",\n  "variables": { "serviceId": "s2", "environmentId": "e1" } }`,
+            },
+            {
+              from: "R",
+              to: "S",
+              ch: "http",
+              label: "{ serviceInstanceDeployV2: true }",
+              title: "“Accepted.” That's all.",
+              text: "Railway doesn't return the new deployment. So the client has no data to put in the cache, and it doesn't try to guess.",
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "http",
+              label: "200",
+              title: "Mutation resolved",
+              text: "<code>isPending</code> becomes false, and <code>onSuccess</code> runs.",
+            },
+            {
+              from: "B",
+              to: "B",
+              ch: "local",
+              label: "onSuccess → invalidateQueries",
+              title: "Don't patch the cache. Invalidate it.",
+              text: '<code>invalidateQueries</code> marks <code>["project", id]</code> as stale. Because the page is watching that entry, TanStack Query refetches it right away.',
+              code: `const onSuccess = () =>\n  queryClient.invalidateQueries({ queryKey: projectQuery(projectId).queryKey });`,
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "http",
+              label: "getProjectFn (refetch)",
+              title: "Read path again",
+              text: "Exactly the request from tab ②.",
+            },
+            {
+              from: "S",
+              to: "R",
+              ch: "http",
+              label: "query Project",
+              title: "Ask Railway",
+              text: "",
+            },
+            {
+              from: "R",
+              to: "S",
+              ch: "http",
+              label: "latestDeployment: { status: QUEUED }",
+              title: "Now we see the new deployment",
+              text: "The service's <code>latestDeployment</code> is a new ID with status <code>QUEUED</code>.",
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "http",
+              label: "200 · fresh project",
+              title: "Badge: ⟳ Deploying 0s",
+              text: "The row shows a spinner and starts counting. The refetched data has a new deployment ID, so <code>keepEnvironmentLive</code> subscribes to <code>deployment(newId)</code>. From here on, pushes take over (Chapter 8).",
+            },
+          ],
+        },
+      });
+
+      makePlayer($("#player-relay"), {
+        tabs: [
+          ["open", "④ Opening the live connection"],
+          ["expire", "⑤ Token about to expire"],
+        ],
+        lanes: [
+          ["b", "🧑‍💻 Browser", "live-client.ts"],
+          ["s", "🖥️ Relay", "/api/live · live-socket.ts"],
+          ["r", "🚂 Railway", "WebSocket endpoints"],
+        ],
+        legend: `${HTTP_LEGEND}<span><i style="border-color: var(--ws); border-top-style: dashed"></i>WebSocket frame</span>`,
+        flows: {
+          open: [
+            {
+              from: "B",
+              to: "B",
+              ch: "local",
+              label: "first subscribe() → connect",
+              title: "Lazy: no socket until it's needed",
+              text: "The page mounts, and <code>useWatchEnvironment</code> starts <code>keepEnvironmentLive</code>, which calls <code>subscribeRaw(CANVAS_INVALIDATION, …)</code>. That's the first subscription, so the graphql-ws client starts connecting. Before connecting, it calls our <code>url</code> function.",
+              code: `url: async () => {\n  const { signedIn } = await ensureLiveSession();\n  if (!signedIn) { setConnection("signed-out"); throw new SignedOutError(…); }\n  return "ws://localhost:3000/api/live";\n},`,
+              file: "railway/live/live-client.ts",
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "http",
+              label: "POST ensureLiveSession",
+              title: "Refresh first, over plain HTTP",
+              text: "A tiny server function that calls <code>getFreshSession()</code>. Why bother? If the token needs refreshing, the new one must end up in the cookie, and setting a cookie needs a normal HTTP response. The WebSocket upgrade that follows can't do that, according to the code comment.",
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "http",
+              label: "{ signedIn: true } (+ Set-Cookie)",
+              title: "Cookie is fresh",
+              text: "If the token was refreshed, the response updates the session cookie. If the user is signed out, the client stops here and won't retry.",
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "http",
+              label: "GET /api/live · Upgrade: websocket",
+              title: "Ask to switch protocols",
+              text: "A WebSocket starts life as an HTTP GET. The browser attaches cookies like for any same-origin request, so the session cookie goes along.",
+              env: `<span class="h">GET /api/live HTTP/1.1</span>\nUpgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Protocol: graphql-transport-ws\nCookie: railway_session=<span class="sec">eyJhbGciOiJkaXIi…</span>`,
+            },
+            {
+              from: "S",
+              to: "S",
+              ch: "local",
+              label: "upgrade(): decrypt cookie",
+              title: "Authenticate the upgrade",
+              text: "Reject with 401 if there's no session or the token has under 60 s left. Otherwise, stash the token in the connection's private <code>context</code>. It stays on the server.",
+              code: `const session = await readSessionFromRequest(request);\nif (!session || session.accessTokenExpiresAt - Date.now() < TOKEN_EXPIRY_MARGIN_MS) {\n  throw new Response("Unauthorized", { status: 401 });\n}\nreturn { protocol: "graphql-transport-ws", context: { accessToken, accessTokenExpiresAt } };`,
+              file: "railway/live/live-socket.ts",
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "http",
+              label: "101 Switching Protocols",
+              title: "It's a WebSocket now",
+              text: "From here on, the same TCP connection carries WebSocket frames both ways. <code>open()</code> starts a timer to close this socket a minute before the token expires (tab ⑤).",
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "ws",
+              label: "connection_init",
+              title: "Protocol hello",
+              text: "graphql-ws always starts with this. The browser sends no credentials in it: the cookie already did that job.",
+              env: `{ "type": "connection_init" }`,
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "ws",
+              label: "connection_ack",
+              title: "The relay answers itself",
+              text: "No need to ask Railway: the upgrade was already authenticated.",
+              code: `case "connection_init":\n  // The upgrade was already authenticated with the session cookie.\n  send({ type: "connection_ack" });`,
+              file: "railway/live/live-socket.ts",
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "ws",
+              label: "subscribe id=1 · canvasInvalidation",
+              title: "Subscribe",
+              text: "The message is validated with Zod (anything unexpected closes the socket with 4400), and the id must not already be in use (4409).",
+              env: `{ "type": "subscribe", "id": "1",\n  "payload": {\n    "query": "subscription CanvasInvalidation($environmentId: String!) { canvasInvalidation(environmentId: $environmentId) { id } }",\n    "variables": { "environmentId": "e1" } } }`,
+            },
+            {
+              from: "S",
+              to: "S",
+              ch: "local",
+              label: "endpointFor() → internal",
+              title: "Pick an upstream",
+              text: "The relay parses the document. One operation, a subscription, and its only field is <code>canvasInvalidation</code>, so it goes to the internal endpoint. (Try it in the lab below.)",
+            },
+            {
+              from: "S",
+              to: "R",
+              ch: "ws",
+              label: "open /graphql/internal · init + Bearer",
+              title: "The relay's own socket",
+              text: "The first subscription that needs this endpoint creates an upstream graphql-ws client for it. <b>Here</b> is where the token goes: in <code>connection_init</code>, server to server. The upstream doesn't retry: if Railway drops it, the relay drops the browser, which reconnects cleanly.",
+              env: `→ wss://backboard.railway.com/graphql/internal\n{ "type": "connection_init",\n  "payload": { "Authorization": "Bearer <span class="sec">eyJhbGciOi…</span>" } }`,
+            },
+            {
+              from: "S",
+              to: "R",
+              ch: "ws",
+              label: "subscribe (upstream)",
+              title: "Same query, forwarded",
+              text: "The upstream client makes up its own id. The relay remembers which browser id it belongs to through a closure, so no lookup table is needed.",
+            },
+            {
+              from: "R",
+              to: "S",
+              ch: "ws",
+              label: 'next · { canvasInvalidation: { id: "a1f…" } }',
+              title: "Railway pushes",
+              text: "The current state hash. Railway sends one shortly after subscribing, and then again every 2 → 4 → 8 s.",
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "ws",
+              label: "next id=1 (forwarded)",
+              title: "Forward, re-tagged with the browser's id",
+              text: "The relay passes the payload through untouched. <code>keepEnvironmentLive</code> receives it, sees a new hash, and schedules a refetch.",
+              code: `next: (result) => send({ type: "next", id, payload: result }),`,
+              file: "railway/live/live-socket.ts",
+            },
+          ],
+          expire: [
+            {
+              from: "S",
+              to: "S",
+              ch: "local",
+              label: "expiry timer fires (token − 60 s)",
+              title: "Access tokens last one hour",
+              text: "The relay can't refresh the token itself, because it has no HTTP response to set a cookie on. So it ends the connection a minute early and lets the browser start over.",
+              code: `expiryTimer: setTimeout(() => peer.close(CLOSE_RECONNECT, "Session expiring"), expiresInMs),`,
+              file: "railway/live/live-socket.ts",
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "ws",
+              label: "close 1012 “Session expiring”",
+              title: "Why 1012 and not 4401 Unauthorized?",
+              text: "graphql-ws treats 4401 as fatal and gives up. 1012 (“service restart”) is an ordinary close code, so the client reconnects. The relay's <code>close()</code> handler then unsubscribes everything and disposes the upstream sockets.",
+            },
+            {
+              from: "S",
+              to: "R",
+              ch: "ws",
+              label: "dispose upstream sockets",
+              title: "Clean up",
+              text: "No Railway connection outlives the browser connection it serves.",
+            },
+            {
+              from: "B",
+              to: "B",
+              ch: "local",
+              label: "connecting(isRetry) → “reconnecting”",
+              title: "Badge flips to polling for a moment",
+              text: '<code>connection</code> is no longer <code>"connected"</code>, so <code>mode</code> becomes <code>"polling"</code>. A 30 s poll interval is armed, but the reconnect usually finishes long before it fires.',
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "http",
+              label: "POST ensureLiveSession",
+              title: "url() runs again",
+              text: "Every connection attempt goes through the same refresh-first path as the first one.",
+            },
+            {
+              from: "S",
+              to: "R",
+              ch: "http",
+              label: "refresh_token grant",
+              title: "Refresh the token",
+              text: "The token is about to expire, so <code>getFreshSession()</code> actually refreshes this time (the OAuth refresh from part 1).",
+            },
+            {
+              from: "R",
+              to: "S",
+              ch: "http",
+              label: "new access token",
+              title: "Fresh for another hour",
+              text: "",
+            },
+            {
+              from: "S",
+              to: "B",
+              ch: "http",
+              label: "{ signedIn: true } + Set-Cookie",
+              title: "New cookie",
+              text: "The encrypted session cookie now holds the new token.",
+              env: `<span class="h">HTTP/1.1 200 OK</span>\nSet-Cookie: railway_session=<span class="sec">eyJ…(new)…</span>; HttpOnly; SameSite=Lax`,
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "http",
+              label: "GET /api/live (new cookie) → 101",
+              title: "Upgrade again",
+              text: "The upgrade request carries the new cookie, so the relay's new connection gets the new token.",
+            },
+            {
+              from: "B",
+              to: "S",
+              ch: "ws",
+              label: "init · subscribe 1, 2, 3 …",
+              title: "graphql-ws resubscribes on its own",
+              text: "Every subscription that was active before the drop is sent again automatically. The app code doesn't do anything here.",
+            },
+            {
+              from: "B",
+              to: "B",
+              ch: "local",
+              label: "connected(wasRetry) → refetch",
+              title: "Catch up on what was missed",
+              text: "Events that happened while disconnected are gone, so the reconnect listener schedules one refetch to be safe.",
+              code: `connected: (_socket, _payload, wasRetry) => {\n  setConnection("connected");\n  // Events may have been missed while disconnected.\n  if (wasRetry) for (const listener of reconnectListeners) listener();\n},`,
+              file: "railway/live/live-client.ts",
+            },
+          ],
+        },
+      });
+
+      /* ================================================================ ch4: cache lab */
+      (function cacheLab() {
+        let status = "success",
+          fetching = false,
+          version = 1,
+          updated = Date.now(),
+          polling = false,
+          pollTimer,
+          fetchTimer;
+        const log = (html) => {
+          const el = $("#cache-log");
+          const t = new Date().toLocaleTimeString([], { hour12: false });
+          el.innerHTML += `<div class="fade-in"><span class="prompt">${t}</span> ${html}</div>`;
+          el.scrollTop = el.scrollHeight;
+        };
+        function render() {
+          const age = Math.round((Date.now() - updated) / 1000);
+          $("#cache-kv").innerHTML = `
+            <span class="k2">queryKey</span><span class="v">["project", "p1"]</span>
+            <span class="k2">status</span><span class="v">${status}</span>
+            <span class="k2">fetchStatus</span><span class="v ${fetching ? "k" : ""}">${fetching ? "fetching…" : "idle"}</span>
+            <span class="k2">isStale</span><span class="v">true <span class="muted">(staleTime: 0 by default, so data counts as stale right away)</span></span>
+            <span class="k2">data</span><span class="v">{ name: "my-project", … } <span class="s">v${version}</span></span>
+            <span class="k2">dataUpdatedAt</span><span class="v">${age}s ago</span>`;
+          $("#cache-obs").innerHTML = `
+            <div class="chip"><span><b>ProjectPage</b> · useSuspenseQuery</span><small>renders v${version}</small></div>
+            <div class="chip"><span><b>keepEnvironmentLive</b> · QueryObserver</span><small>refetchInterval: ${polling ? '<span class="k">30_000</span>' : "false"}</small></div>`;
+          $("#cache-poll").textContent = polling
+            ? "Live watcher: back to live"
+            : "Live watcher: switch to polling";
+        }
+        function fetchNow(reason) {
+          if (fetching) {
+            log(
+              `<span class="bad">cancel</span> the in-flight fetch <span class="muted">(invalidate defaults to cancelRefetch: true)</span>`,
+            );
+            clearTimeout(fetchTimer);
+          }
+          fetching = true;
+          log(`fetch: <code>getProjectFn()</code> <span class="muted">(${reason})</span>`);
+          render();
+          fetchTimer = setTimeout(() => {
+            fetching = false;
+            version++;
+            updated = Date.now();
+            log(
+              `<span class="good">data v${version}</span> → both observers notified, ProjectPage re-renders`,
+            );
+            render();
+          }, 900);
+        }
+        $("#cache-inv").onclick = () => {
+          log(
+            `<code>invalidateQueries({ queryKey: ["project","p1"] })</code>: marked stale; it has active observers, so refetch`,
+          );
+          fetchNow("invalidated");
+        };
+        $("#cache-poll").onclick = () => {
+          polling = !polling;
+          clearInterval(pollTimer);
+          if (polling) {
+            log(
+              `observer option changed: <code>refetchInterval: 30_000</code>. Sped up ×6 here so you don't have to wait`,
+            );
+            pollTimer = setInterval(() => fetchNow("refetchInterval"), 5000);
+          } else log(`<code>refetchInterval: false</code>: polling stopped`);
+          render();
+        };
+        $("#cache-focus").onclick = () => {
+          log(
+            `window focus event: data is stale and <code>refetchOnWindowFocus</code> is on by default`,
+          );
+          fetchNow("window focus");
+        };
+        setInterval(render, 1000);
+        render();
+        log(`entry hydrated from the server render <span class="muted">(v1)</span>`);
+      })();
+
+      /* ================================================================ ch5: polling lab */
+      (function pollLab() {
+        const EVENTS = [22, 71, 74, 160, 255, 262, 390, 488, 541, 588];
+        const W = 900,
+          L = 120,
+          R = 880,
+          SPAN = 600;
+        const X = (s) => L + (s / SPAN) * (R - L);
+        const PUSH_DELAY = 1.0 + 0.25 + 0.4;
+        function render() {
+          const iv = +$("#poll-r").value;
+          $("#poll-v").textContent = `${iv} s`;
+          const ticks = [];
+          for (let t = iv; t <= SPAN; t += iv) ticks.push(t);
+          let s = "";
+          const rows = [
+            [44, "Changes", "var(--railway)"],
+            [120, "Polling", "var(--secret)"],
+            [196, "Push (this app)", "var(--ws)"],
+          ];
+          for (const [y, label, col] of rows) {
+            s += `<text x="12" y="${y + 4}" fill="${col}" font-size="13" font-weight="600" font-family="var(--sans)">${label}</text>`;
+            s += `<line x1="${L}" x2="${R}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1.5"/>`;
+          }
+          for (let m = 0; m <= 10; m++)
+            s += `<text x="${X(m * 60)}" y="226" fill="var(--faint)" font-size="10" text-anchor="middle" font-family="var(--mono)">${m}m</text>`;
+          for (const t of ticks)
+            s += `<line x1="${X(t)}" x2="${X(t)}" y1="${112}" y2="${128}" stroke="var(--secret)" stroke-opacity=".7" stroke-width="1.5"/>`;
+          const delays = [];
+          for (const e of EVENTS) {
+            const det = ticks.find((t) => t >= e);
+            const d = det == null ? null : det - e + 0.4;
+            if (d != null) delays.push(d);
+            s += `<circle cx="${X(e)}" cy="44" r="5" fill="var(--railway)"/>`;
+            if (det != null) {
+              const col = d > 30 ? "var(--danger)" : d > 10 ? "var(--secret)" : "var(--ok)";
+              s += `<line x1="${X(e)}" y1="50" x2="${X(det)}" y2="114" stroke="${col}" stroke-width="1.5" stroke-opacity=".8"/>`;
+              s += `<circle cx="${X(det)}" cy="120" r="4" fill="${col}"/>`;
+            }
+            s += `<line x1="${X(e)}" y1="50" x2="${X(e + PUSH_DELAY)}" y2="190" stroke="var(--ok)" stroke-width="1.2" stroke-opacity=".6"/>`;
+            s += `<circle cx="${X(e + PUSH_DELAY)}" cy="196" r="4" fill="var(--ws)"/>`;
+          }
+          $("#poll-svg").innerHTML = s;
+          const avg = delays.reduce((a, b) => a + b, 0) / delays.length;
+          const worst = Math.max(...delays);
+          const perHour = Math.round(3600 / iv);
+          $("#poll-stats").innerHTML = `
+            <div><b>${avg.toFixed(1)} s</b>average delay, polling</div>
+            <div><b>${worst.toFixed(0)} s</b>worst delay, polling</div>
+            <div><b>${perHour}</b>requests / hour / tab, polling (mostly “nothing changed”)</div>
+            <div><b>~${PUSH_DELAY.toFixed(1)} s</b>delay with push, and one refetch per actual change</div>`;
+        }
+        $("#poll-r").oninput = render;
+        render();
+      })();
+
+      /* ================================================================ ch6: protocol lab */
+      (function protoLab() {
+        const wire = $("#wire");
+        let open, acked, nextId, subs, hash, timers;
+        const Q = {
+          deployment:
+            "subscription DeploymentStatus($id: String!) { deployment(id: $id) { id status } }",
+          canvas:
+            "subscription CanvasInvalidation($environmentId: String!) { canvasInvalidation(environmentId: $environmentId) { id } }",
+          query: "query Project($id: String!) { project(id: $id) { name } }",
+        };
+        const pretty = (o) => JSON.stringify(o, null, 1).replace(/\n\s*/g, " ");
+        function frame(dir, obj, note) {
+          const el = document.createElement("div");
+          el.className = `frame ${dir}`;
+          el.innerHTML = `<span class="who">${dir === "up" ? "browser → relay" : "relay → browser"}</span>${esc(pretty(obj))}${note ? `<span class="note">${note}</span>` : ""}`;
+          wire.appendChild(el);
+          wire.scrollTop = wire.scrollHeight;
+        }
+        function sys(html, bad) {
+          const el = document.createElement("div");
+          el.className = `frame sys${bad ? " bad" : ""}`;
+          el.innerHTML = html;
+          wire.appendChild(el);
+          wire.scrollTop = wire.scrollHeight;
+        }
+        const later = (ms, fn) => timers.push(setTimeout(fn, ms));
+        function closeSocket(code, reason, note) {
+          open = false;
+          timers.forEach(clearTimeout);
+          subs.forEach((s) => clearInterval(s.timer));
+          subs.clear();
+          sys(`🔌 relay closed the socket: <b>${code} ${reason}</b><br>${note}`, true);
+          renderActions();
+        }
+        function reset() {
+          (timers || []).forEach(clearTimeout);
+          (subs || new Map()).forEach((s) => clearInterval(s.timer));
+          open = true;
+          acked = false;
+          nextId = 1;
+          subs = new Map();
+          hash = "a1f3c9";
+          timers = [];
+          wire.innerHTML = "";
+          sys(
+            "GET /api/live → <b>101 Switching Protocols</b>. The cookie was checked, and the socket is open.",
+          );
+          renderActions();
+        }
+        function startCanvas(id) {
+          const s = { kind: "canvas", endpoint: "internal", started: Date.now() };
+          subs.set(id, s);
+          let sent;
+          const push = () => {
+            if (!subs.has(id)) return;
+            const note =
+              sent === undefined
+                ? "First hash: counts as new (lastHash is undefined), so the page refetches."
+                : sent !== hash
+                  ? "<b>New hash</b>: something changed, so a debounced refetch."
+                  : "Same hash re-sent as a heartbeat. The page ignores it, but it resets the 30 s watchdog.";
+            sent = hash;
+            frame(
+              "down",
+              { type: "next", id, payload: { data: { canvasInvalidation: { id: hash } } } },
+              note,
+            );
+          };
+          s.push = push;
+          later(500, push);
+          s.timer = setInterval(push, 4500);
+        }
+        function send(kind) {
+          if (!open) return;
+          if (kind === "init") {
+            frame("up", { type: "connection_init" });
+            later(250, () => {
+              acked = true;
+              frame(
+                "down",
+                { type: "connection_ack" },
+                "Answered by the relay itself. Railway isn't involved.",
+              );
+              renderActions();
+            });
+          } else if (kind === "ping") {
+            frame("up", { type: "ping" });
+            later(200, () => frame("down", { type: "pong" }));
+          } else if (kind === "deployment" || kind === "canvas") {
+            const id = String(nextId++);
+            const variables = kind === "canvas" ? { environmentId: "e1" } : { id: "d7" };
+            const upstreamNew = ![...subs.values()].some(
+              (x) => (x.kind === "canvas") === (kind === "canvas"),
+            );
+            frame(
+              "up",
+              { type: "subscribe", id, payload: { query: Q[kind], variables } },
+              `endpointFor() → <b>${kind === "canvas" ? "wss://…/graphql/internal" : "wss://…/graphql/v2"}</b>. ` +
+                (upstreamNew
+                  ? "First subscription for that endpoint, so the relay opens an upstream socket with the Bearer token. "
+                  : "Reuses the existing upstream socket. ") +
+                (acked
+                  ? ""
+                  : "(No <code>connection_init</code> yet. The relay doesn't insist, because the upgrade already authenticated you. Real clients always send it first.)"),
+            );
+            if (kind === "canvas") startCanvas(id);
+            else {
+              subs.set(id, { kind, endpoint: "public", started: Date.now() });
+              later(400, () =>
+                sys(
+                  `subscription ${id} is active. <code>deployment(id)</code> sends nothing until the status changes (measured).`,
+                ),
+              );
+            }
+          } else if (kind === "query") {
+            const id = String(nextId++);
+            frame("up", {
+              type: "subscribe",
+              id,
+              payload: { query: Q.query, variables: { id: "p1" } },
+            });
+            later(250, () =>
+              frame(
+                "down",
+                {
+                  type: "error",
+                  id,
+                  payload: [{ message: "Only single subscription operations are allowed" }],
+                },
+                "Queries go through server functions, not the socket. The connection stays open.",
+              ),
+            );
+          } else if (kind === "dup") {
+            const id = [...subs.keys()][0];
+            frame("up", {
+              type: "subscribe",
+              id,
+              payload: { query: Q.deployment, variables: { id: "d8" } },
+            });
+            later(200, () =>
+              closeSocket(
+                4409,
+                `Subscriber for ${id} already exists`,
+                "graphql-ws treats this as fatal, so a real client wouldn't retry. The real client never reuses ids, though.",
+              ),
+            );
+          } else if (kind === "junk") {
+            frame("up", { type: "hello", from: "curl" });
+            later(200, () =>
+              closeSocket(
+                4400,
+                "Invalid message",
+                "Every message is checked against a Zod discriminated union. Anything else closes the socket.",
+              ),
+            );
+          } else if (kind === "finish") {
+            const entry = [...subs].find(([, s]) => s.kind === "deployment");
+            if (!entry) return;
+            const [id] = entry;
+            hash = Math.random().toString(16).slice(2, 8);
+            sys("⚙️ Railway: deployment d7 finished.");
+            later(300, () =>
+              frame(
+                "down",
+                {
+                  type: "next",
+                  id,
+                  payload: { data: { deployment: { id: "d7", status: "SUCCESS" } } },
+                },
+                "Treated as a signal: debounced refetch.",
+              ),
+            );
+            later(1000, () => subs.forEach((s) => s.kind === "canvas" && s.push()));
+          } else if (kind === "railwayEnds") {
+            const entry = [...subs].find(([, s]) => s.kind === "canvas");
+            if (!entry) return;
+            const [id, s] = entry;
+            clearInterval(s.timer);
+            subs.delete(id);
+            const lived = Date.now() - s.started;
+            const healthy = lived >= 10000;
+            frame(
+              "down",
+              { type: "complete", id },
+              `Railway ended it (it does this after ~95 s), and the relay passes it on. It lived ${Math.round(lived / 1000)} s, ` +
+                (healthy
+                  ? "so <code>subscribeRaw</code> resubscribes immediately."
+                  : "under the 10 s healthy minimum, so <code>subscribeRaw</code> backs off 10 s before resubscribing."),
+            );
+            later(healthy ? 500 : 10000, () => {
+              const nid = String(nextId++);
+              frame(
+                "up",
+                {
+                  type: "subscribe",
+                  id: nid,
+                  payload: { query: Q.canvas, variables: { environmentId: "e1" } },
+                },
+                "Automatic resubscribe, with a new id.",
+              );
+              startCanvas(nid);
+              renderActions();
+            });
+          } else if (kind.startsWith("complete:")) {
+            const id = kind.slice(9);
+            const s = subs.get(id);
+            clearInterval(s?.timer);
+            subs.delete(id);
+            frame(
+              "up",
+              { type: "complete", id },
+              "Unsubscribe. The relay calls the upstream unsubscribe function and sends nothing back.",
+            );
+          }
+          renderActions();
+        }
+        function renderActions() {
+          const has = (k) => [...subs.values()].some((s) => s.kind === k);
+          const B = (k, label, dis) =>
+            `<button data-k="${k}" ${dis || !open ? "disabled" : ""}>${label}</button>`;
+          $("#proto-actions").innerHTML = `
+            <div class="group">Protocol</div>
+            ${B("init", "connection_init", acked)}
+            ${B("ping", "ping")}
+            <div class="group">Subscribe</div>
+            ${B("deployment", "subscribe · deployment(id)")}
+            ${B("canvas", "subscribe · canvasInvalidation", has("canvas"))}
+            ${B("query", "subscribe · a <i>query</i>")}
+            <div class="group">Make things happen</div>
+            ${B("finish", "⚙️ Railway: a deployment finishes", !has("deployment"))}
+            ${B("railwayEnds", "⏱ Railway ends the canvas subscription", !has("canvas"))}
+            <div class="group">Misbehave</div>
+            ${B("dup", "reuse an id that's in use", subs.size === 0)}
+            ${B("junk", "send a made-up message type")}
+            <div class="group"></div>
+            <button data-k="reset">↺ New connection</button>`;
+          $$("#proto-actions button").forEach(
+            (b) => (b.onclick = () => (b.dataset.k === "reset" ? reset() : send(b.dataset.k))),
+          );
+          $("#proto-subs").innerHTML = open
+            ? subs.size
+              ? `<span class="muted">Active:</span> ${[...subs].map(([id, s]) => `<span class="pill">id ${id} · ${s.kind === "canvas" ? "canvas" : "deployment"} <button data-c="${id}" style="padding:0 6px;font-size:.7rem">complete</button></span>`).join("")}`
+              : `<span class="muted">No active subscriptions.</span>`
+            : `<span class="bad">Socket closed.</span>`;
+          $$("#proto-subs button").forEach(
+            (b) => (b.onclick = () => send("complete:" + b.dataset.c)),
+          );
+        }
+        reset();
+      })();
+
+      /* ================================================================ ch7: endpointFor lab */
+      (function routerLab() {
+        const PRESETS = [
+          [
+            "canvasInvalidation",
+            `subscription CanvasInvalidation($environmentId: String!) {\n  canvasInvalidation(environmentId: $environmentId) {\n    id\n  }\n}`,
+          ],
+          [
+            "deployment(id)",
+            `subscription DeploymentStatus($id: String!) {\n  deployment(id: $id) {\n    id\n    status\n  }\n}`,
+          ],
+          ["a query", `query Project($id: String!) {\n  project(id: $id) {\n    name\n  }\n}`],
+          ["a mutation", `mutation Remove($id: String!) {\n  deploymentRemove(id: $id)\n}`],
+          [
+            "mixed fields",
+            `subscription Both($environmentId: String!, $id: String!) {\n  canvasInvalidation(environmentId: $environmentId) { id }\n  deployment(id: $id) { status }\n}`,
+          ],
+          [
+            "two operations",
+            `subscription A($id: String!) { deployment(id: $id) { status } }\nsubscription B($id: String!) { deployment(id: $id) { id } }`,
+          ],
+          ["broken", `subscription {\n  deployment(id: "d1") {\n    status\n`],
+        ];
+        const INTERNAL = new Set(["canvasInvalidation"]);
+        // A deliberately small GraphQL reader: enough to find operations and their top-level fields.
+        function analyze(src) {
+          const toks =
+            src
+              .replace(/#[^\n]*/g, "")
+              .match(/\.\.\.|"(?:[^"\\]|\\.)*"|[A-Za-z_]\w*|-?\d+(?:\.\d+)?|[{}()\[\]:$!@=,|&]/g) ||
+            [];
+          if (/"(?:[^"\\]|\\.)*$/.test(src)) return { error: "Invalid GraphQL document" };
+          let depth = 0,
+            paren = 0,
+            pending = null,
+            cur = null,
+            skip = 0;
+          const ops = [];
+          for (let i = 0; i < toks.length; i++) {
+            const t = toks[i];
+            if (t === "(") {
+              paren++;
+              continue;
+            }
+            if (t === ")") {
+              paren--;
+              if (paren < 0) return { error: "Invalid GraphQL document" };
+              continue;
+            }
+            if (paren > 0) continue;
+            if (t === "{") {
+              if (depth === 0) {
+                if (pending === "fragment") cur = null;
+                else {
+                  cur = { type: pending ?? "query", fields: [] };
+                  ops.push(cur);
+                }
+                pending = null;
+              }
+              depth++;
+              continue;
+            }
+            if (t === "}") {
+              depth--;
+              if (depth < 0) return { error: "Invalid GraphQL document" };
+              continue;
+            }
+            if (depth === 0) {
+              if (["query", "mutation", "subscription", "fragment"].includes(t) && pending == null)
+                pending = t;
+              continue;
+            }
+            if (depth === 1 && cur) {
+              if (t === "...") {
+                skip = toks[i + 1] === "on" ? 2 : 1;
+                continue;
+              }
+              if (t === "@") {
+                i++;
+                continue;
+              }
+              if (!/^[A-Za-z_]/.test(t)) continue;
+              if (skip) {
+                skip--;
+                continue;
+              }
+              if (toks[i + 1] === ":") {
+                i++;
+                continue;
+              } // alias: the real name comes next
+              cur.fields.push(t);
+            }
+          }
+          if (depth !== 0 || paren !== 0 || toks.length === 0)
+            return { error: "Invalid GraphQL document" };
+          return { ops };
+        }
+        function run() {
+          const src = $("#router-src").value;
+          const a = analyze(src);
+          const kv = $("#router-kv"),
+            v = $("#router-verdict");
+          if (a.error) {
+            kv.innerHTML = `<span class="k2">parse</span><span class="v bad">failed</span>`;
+            v.className = "verdict no";
+            v.innerHTML = `<b>error</b> frame: “${a.error}”. The subscription never leaves our server.`;
+            return;
+          }
+          const op = a.ops[0];
+          kv.innerHTML = `<span class="k2">operations</span><span class="v">${a.ops.length} (${a.ops.map((o) => o.type).join(", ") || "none"})</span>
+            <span class="k2">top-level fields</span><span class="v">${op ? op.fields.join(", ") || "—" : "—"}</span>`;
+          if (a.ops.length !== 1 || op.type !== "subscription") {
+            v.className = "verdict no";
+            v.innerHTML = `<b>error</b> frame: “Only single subscription operations are allowed”.<br><span class="muted">Queries and mutations go through server functions, which validate their inputs and decide what's allowed.</span>`;
+            return;
+          }
+          const internal = op.fields.filter((f) => INTERNAL.has(f));
+          if (internal.length > 0 && internal.length !== op.fields.length) {
+            v.className = "verdict warn";
+            v.innerHTML = `<b>error</b> frame: “Don't mix internal and public fields in one subscription”.<br><span class="muted">One subscription goes to one upstream socket, and these fields live on different endpoints.</span>`;
+            return;
+          }
+          v.className = "verdict ok";
+          v.innerHTML = internal.length
+            ? `✓ forwarded to <code>wss://backboard.railway.com/graphql/internal</code>`
+            : `✓ forwarded to <code>wss://backboard.railway.com/graphql/v2</code>`;
+        }
+        $("#router-presets").innerHTML = PRESETS.map(
+          ([n], i) => `<button data-i="${i}" class="${i ? "" : "on"}">${n}</button>`,
+        ).join("");
+        $$("#router-presets button").forEach(
+          (b) =>
+            (b.onclick = () => {
+              $$("#router-presets button").forEach((x) => x.classList.toggle("on", x === b));
+              $("#router-src").value = PRESETS[+b.dataset.i][1];
+              run();
+            }),
+        );
+        $("#router-src").value = PRESETS[0][1];
+        $("#router-src").oninput = run;
+        run();
+      })();
+
+      /* ================================================================ ch8: live pipeline sim */
+      (function signalSim() {
+        const W = 900,
+          LW = 160,
+          R = W - 14,
+          WIN = 24000;
+        const ROWS = [
+          ["Railway (truth)", "var(--railway)"],
+          ["canvasInvalidation", "var(--ws)"],
+          ["deployment(id)", "var(--ws)"],
+          ["debounce 250 ms", "var(--secret)"],
+          ["refetch getProjectFn", "var(--server)"],
+        ];
+        const RY = (i) => 36 + i * 48;
+        const H = RY(ROWS.length - 1) + 40;
+        $("#sim-svg").setAttribute("viewBox", `0 0 ${W} ${H}`);
+        const PUSHED = new Set(["SUCCESS", "REMOVING", "REMOVED"]);
+        const HB = [2000, 4000, 8000];
+        let t,
+          items,
+          queue,
+          truth,
+          view,
+          lastHash,
+          hbIdx,
+          debounce,
+          inflight,
+          counters,
+          depN,
+          silent,
+          lastPushAt,
+          canvasDown,
+          nextPoll,
+          nextWatch,
+          changedAt,
+          speed = 1,
+          paused = false,
+          visible = false;
+        const opts = { dedupe: true, debounce: true };
+        const at = (dt, fn) => queue.push({ at: t + dt, fn });
+        const newHash = () => Math.random().toString(16).slice(2, 8);
+        const clone = (o) => JSON.parse(JSON.stringify(o));
+        const subscribed = () =>
+          new Set(
+            Object.values(view.services)
+              .map((s) => s.dep)
+              .filter(Boolean),
+          );
+
+        function reset() {
+          t = 0;
+          items = [];
+          queue = [];
+          depN = 2;
+          silent = false;
+          canvasDown = false;
+          nextPoll = null;
+          nextWatch = 5000;
+          lastPushAt = 0;
+          debounce = null;
+          inflight = null;
+          lastHash = undefined;
+          truth = {
+            hash: newHash(),
+            services: {
+              api: { dep: "d1", status: "SUCCESS", createdAt: -600000 },
+              worker: { dep: "d2", status: "REMOVED", createdAt: -900000 },
+            },
+          };
+          view = clone(truth); // what the server rendered
+          changedAt = {};
+          counters = { pushes: 0, ignored: 0, refetches: 0, cancelled: 0, polls: 0 };
+          hbIdx = -1;
+          items.push({ row: 2, t: 0, kind: "sub", label: "subscribe d1, d2" });
+          heartbeat(300);
+          $("#sim-silence").textContent = "🔇 Make canvasInvalidation go silent";
+        }
+        function heartbeat(delay) {
+          at(delay, () => {
+            canvasPush();
+            hbIdx = Math.min(hbIdx + 1, HB.length - 1);
+            heartbeat(HB[hbIdx]);
+          });
+        }
+        function canvasPush() {
+          if (silent) return;
+          counters.pushes++;
+          lastPushAt = t;
+          canvasDown = false;
+          const h = truth.hash;
+          if (h === lastHash && opts.dedupe) {
+            counters.ignored++;
+            items.push({ row: 1, t, kind: "same", label: "same" });
+            return;
+          }
+          items.push({ row: 1, t, kind: h === lastHash ? "dup" : "new", label: h.slice(0, 4) });
+          lastHash = h;
+          scheduleRefetch();
+        }
+        function deploymentPush(dep, status) {
+          if (!subscribed().has(dep)) return;
+          counters.pushes++;
+          items.push({ row: 2, t, kind: "new", label: `${dep} ${status}` });
+          scheduleRefetch();
+        }
+        function change(svc, patch, label) {
+          Object.assign(truth.services[svc], patch);
+          truth.hash = newHash();
+          items.push({ row: 0, t, kind: "new", label });
+          at(1000, canvasPush);
+          const { dep, status } = truth.services[svc];
+          if (PUSHED.has(status)) at(300, () => deploymentPush(dep, status));
+        }
+        function scheduleRefetch() {
+          if (!opts.debounce) return startRefetch();
+          if (debounce?.open) {
+            debounce.t2 = t + 250;
+            debounce.n++;
+          } else {
+            debounce = { row: 3, t, t2: t + 250, open: true, n: 1, kind: "deb" };
+            items.push(debounce);
+          }
+        }
+        function startRefetch(poll) {
+          if (inflight) {
+            inflight.kind = "cancel";
+            inflight.t2 = t;
+            counters.cancelled++;
+          }
+          counters.refetches++;
+          if (poll) counters.polls++;
+          inflight = { row: 4, t, t2: t + 450, kind: poll ? "poll" : "fetch" };
+          items.push(inflight);
+        }
+        function finishRefetch() {
+          const before = subscribed();
+          for (const [k, s] of Object.entries(truth.services))
+            if (JSON.stringify(s) !== JSON.stringify(view.services[k])) changedAt[k] = t;
+          view = clone(truth);
+          const after = subscribed();
+          const added = [...after].filter((d) => !before.has(d));
+          const removed = [...before].filter((d) => !after.has(d));
+          if (added.length || removed.length)
+            items.push({
+              row: 2,
+              t,
+              kind: "sub",
+              label: [
+                added.length && `+sub ${added.join(",")}`,
+                removed.length && `−sub ${removed.join(",")}`,
+              ]
+                .filter(Boolean)
+                .join("  "),
+            });
+          inflight = null;
+        }
+        function step(dt) {
+          const end = t + dt;
+          while (true) {
+            // next thing to happen, in time order
+            let nextT = end,
+              which = null;
+            const q = queue.reduce((m, e) => (m && m.at <= e.at ? m : e), null);
+            if (q && q.at < nextT) {
+              nextT = q.at;
+              which = "q";
+            }
+            if (debounce?.open && debounce.t2 < nextT) {
+              nextT = debounce.t2;
+              which = "deb";
+            }
+            if (inflight && inflight.t2 < nextT) {
+              nextT = inflight.t2;
+              which = "fetch";
+            }
+            if (nextWatch < nextT) {
+              nextT = nextWatch;
+              which = "watch";
+            }
+            if (nextPoll != null && nextPoll < nextT) {
+              nextT = nextPoll;
+              which = "poll";
+            }
+            t = nextT;
+            if (!which) break;
+            if (which === "q") {
+              queue.splice(queue.indexOf(q), 1);
+              q.fn();
+            } else if (which === "deb") {
+              debounce.open = false;
+              startRefetch();
+            } else if (which === "fetch") finishRefetch();
+            else if (which === "watch") {
+              nextWatch += 5000;
+              if (t - lastPushAt > 30000) canvasDown = true;
+            } else if (which === "poll") {
+              nextPoll += 30000;
+              startRefetch(true);
+            }
+            const polling = canvasDown;
+            if (polling && nextPoll == null) nextPoll = t + 30000;
+            if (!polling) nextPoll = null;
+          }
+          const polling = canvasDown;
+          if (polling && nextPoll == null) nextPoll = t + 30000;
+          if (!polling) nextPoll = null;
+          items = items.filter((it) => (it.t2 ?? it.t) > t - WIN - 2000);
+        }
+        const X = (ms) => LW + ((ms - (t - WIN)) / WIN) * (R - LW);
+        function draw() {
+          let s = "";
+          ROWS.forEach(([label, col], i) => {
+            const y = RY(i);
+            s += `<text x="12" y="${y + 4}" fill="${col}" font-size="13" font-weight="600" font-family="var(--sans)">${label}</text>`;
+            s += `<line x1="${LW}" x2="${R}" y1="${y}" y2="${y}" stroke="var(--line)"/>`;
+          });
+          for (let g = Math.ceil((t - WIN) / 5000) * 5000; g <= t; g += 5000) {
+            if (g < 0) continue;
+            s += `<line x1="${X(g)}" x2="${X(g)}" y1="16" y2="${H - 22}" stroke="var(--line)" stroke-opacity=".5" stroke-dasharray="2 5"/>`;
+            s += `<text x="${X(g)}" y="${H - 8}" fill="var(--faint)" font-size="10" text-anchor="middle" font-family="var(--mono)">${Math.round(g / 1000)}s</text>`;
+          }
+          s += `<line x1="${R}" x2="${R}" y1="14" y2="${H - 22}" stroke="var(--text)" stroke-opacity=".35"/>`;
+          let lastLabelX = {};
+          for (const it of items) {
+            const y = RY(it.row),
+              x = X(it.t);
+            if (x < LW - 4) {
+              if (it.t2 == null || X(it.t2) < LW) continue;
+            }
+            const xc = Math.max(LW, x);
+            if (it.row <= 2) {
+              if (it.kind === "sub") {
+                s += `<text x="${xc + 4}" y="${y + 16}" fill="var(--faint)" font-size="10" font-family="var(--mono)">${esc(it.label)}</text>`;
+                continue;
+              }
+              const col = ROWS[it.row][1];
+              if (it.kind === "same")
+                s += `<circle cx="${xc}" cy="${y}" r="4.5" fill="#0a0c10" stroke="var(--faint)" stroke-width="1.5"/>`;
+              else
+                s += `<circle cx="${xc}" cy="${y}" r="5.5" fill="${col}" ${it.kind === "dup" ? 'fill-opacity=".45"' : ""}/>`;
+              const key = it.row;
+              if (it.kind !== "same" || !(lastLabelX[key] > xc - 40)) {
+                s += `<text x="${xc}" y="${y - 10}" fill="${it.kind === "same" ? "var(--faint)" : "var(--text)"}" font-size="10" text-anchor="middle" font-family="var(--mono)">${esc(it.label)}</text>`;
+                lastLabelX[key] = xc;
+              }
+            } else {
+              const x2 = X(Math.min(it.t2, t)),
+                w = Math.max(3, x2 - xc);
+              const col =
+                it.kind === "cancel"
+                  ? "var(--danger)"
+                  : it.row === 3
+                    ? "var(--secret)"
+                    : "var(--server)";
+              s += `<rect x="${xc}" y="${y - 8}" width="${w}" height="16" rx="4" fill="${col}" fill-opacity="${it.kind === "cancel" ? 0.35 : 0.6}"/>`;
+              if (it.kind === "cancel")
+                s += `<line x1="${xc}" x2="${xc + w}" y1="${y}" y2="${y}" stroke="var(--danger)" stroke-width="2"/>`;
+              if (it.row === 3 && it.n > 1)
+                s += `<text x="${xc + w / 2}" y="${y - 12}" fill="var(--secret)" font-size="10" text-anchor="middle" font-family="var(--mono)">${it.n} events → 1</text>`;
+              if (it.kind === "poll")
+                s += `<text x="${xc + w / 2}" y="${y - 12}" fill="var(--secret)" font-size="10" text-anchor="middle" font-family="var(--mono)">poll</text>`;
+            }
+          }
+          if (silent)
+            s += `<text x="${(LW + R) / 2}" y="${RY(1) + 20}" fill="var(--danger)" font-size="11" text-anchor="middle" font-family="var(--sans)">silent for ${Math.round((t - lastPushAt) / 1000)} s ${canvasDown ? "→ watchdog tripped: polling" : "(watchdog trips after 30 s)"}</text>`;
+          $("#sim-svg").innerHTML = s;
+        }
+        const STATE = (st) =>
+          st === "SUCCESS"
+            ? ["run", "Running"]
+            : st === "REMOVED" || st == null
+              ? ["stop", "Stopped"]
+              : st === "REMOVING"
+                ? ["pend", "Stopping"]
+                : ["pend", "Deploying"];
+        function svcRow(name, s, live) {
+          const [k, label] = STATE(s.status);
+          const el =
+            k === "pend" && live ? ` ${Math.max(0, Math.round((t - s.createdAt) / 1000))}s` : "";
+          const flash =
+            live && t - (changedAt[name] ?? -1e9) < 900 ? "background: rgba(61,220,151,.14)" : "";
+          return `<div class="row" style="${flash}"><span>${name}<small>${s.dep} · ${s.status}</small></span><span class="badge ${k}">${k === "pend" ? '<span class="spin"></span>' : ""}${label}${el}</span></div>`;
+        }
+        function renderMock() {
+          const mode = canvasDown ? "polling" : "live";
+          $("#sim-mock").innerHTML =
+            `<div class="top"><b>my-project</b><span class="badge ${mode === "live" ? "live" : "poll"}">${mode === "live" ? "● Live" : "Polling every 30s"}</span></div>
+            ${Object.entries(view.services)
+              .map(([n, s]) => svcRow(n, s, true))
+              .join("")}`;
+          $("#sim-truth").innerHTML = Object.entries(truth.services)
+            .map(([n, s]) => svcRow(n, s, false))
+            .join("");
+          $("#sim-counters").innerHTML =
+            `<span>pushes <b>${counters.pushes}</b></span><span>ignored (same hash) <b>${counters.ignored}</b></span>
+            <span>refetches <b>${counters.refetches}</b></span><span>cancelled <b>${counters.cancelled}</b></span><span>polls <b>${counters.polls}</b></span>`;
+          const w = truth.services.worker;
+          $("#sim-worker").textContent =
+            w.status === "SUCCESS" ? "⏹ Stop worker (from dashboard)" : "▶ Start worker (from CLI)";
+          $("#sim-worker").disabled = !(w.status === "SUCCESS" || w.status === "REMOVED");
+          const a = truth.services.api;
+          $("#sim-api").disabled = a.status !== "SUCCESS";
+          $("#sim-burst").disabled = a.status !== "SUCCESS";
+        }
+        $("#sim-worker").onclick = () => {
+          const w = truth.services.worker;
+          if (w.status === "SUCCESS") {
+            change("worker", { status: "REMOVING" }, "worker REMOVING");
+            at(2500, () => change("worker", { status: "REMOVED" }, "worker REMOVED"));
+          } else if (w.status === "REMOVED") {
+            const dep = `d${++depN}`;
+            change("worker", { dep, status: "QUEUED", createdAt: t }, `worker ${dep} QUEUED`);
+            at(4000, () => change("worker", { status: "DEPLOYING" }, "DEPLOYING"));
+            at(13000, () => change("worker", { status: "SUCCESS" }, "worker SUCCESS"));
+          }
+        };
+        $("#sim-api").onclick = () => {
+          const dep = `d${++depN}`;
+          change("api", { dep, status: "QUEUED", createdAt: t }, `api ${dep} QUEUED`);
+          at(4000, () => change("api", { status: "DEPLOYING" }, "DEPLOYING"));
+          at(12000, () => change("api", { status: "SUCCESS" }, "api SUCCESS"));
+        };
+        $("#sim-burst").onclick = () => {
+          const dep = view.services.api.dep;
+          [0, 80, 160].forEach((d) => at(d, () => deploymentPush(dep, "SUCCESS")));
+        };
+        $("#sim-silence").onclick = () => {
+          silent = !silent;
+          $("#sim-silence").textContent = silent
+            ? "🔊 Let canvasInvalidation speak again"
+            : "🔇 Make canvasInvalidation go silent";
+        };
+        $("#sim-reset").onclick = () => {
+          reset();
+          draw();
+          renderMock();
+        };
+        $("#sim-dedupe").onchange = (e) => (opts.dedupe = e.target.checked);
+        $("#sim-debounce").onchange = (e) => (opts.debounce = e.target.checked);
+        $("#sim-pause").onclick = () => {
+          paused = !paused;
+          $("#sim-pause").textContent = paused ? "▶ Resume" : "⏸ Pause";
+        };
+        $$("#sim-speed button").forEach(
+          (b) =>
+            (b.onclick = () => {
+              speed = +b.dataset.s;
+              $$("#sim-speed button").forEach((x) => x.classList.toggle("on", x === b));
+            }),
+        );
+        new IntersectionObserver(([e]) => (visible = e.isIntersecting)).observe($("#sim-svg"));
+        reset();
+        let last = performance.now(),
+          lastMock = 0;
+        function frame(now) {
+          const dt = Math.min(100, now - last);
+          last = now;
+          if (visible && !paused) {
+            step(dt * speed);
+            draw();
+            if (now - lastMock > 120) {
+              renderMock();
+              lastMock = now;
+            }
+          }
+          nextFrame(frame);
+        }
+        draw();
+        renderMock();
+        nextFrame(frame);
+      })();
+
+      /* ================================================================ ch9: truth table + failures */
+      (function truthTable() {
+        const CONN = [
+          ["connecting", "connecting", "First connection attempt (also what the server renders)."],
+          ["connected", "connected", "Socket open and acknowledged."],
+          [
+            "reconnecting",
+            "reconnecting",
+            "Dropped. graphql-ws is retrying (forever, with backoff).",
+          ],
+          ["signed-out", "signed-out", "<code>ensureLiveSession</code> said no. Retrying stops."],
+        ];
+        const CANVAS = [
+          ["ok", "pushing hashes", true, "Hashes arrive at least every ~8 s."],
+          [
+            "completed",
+            "Railway ended it (95 s)",
+            true,
+            "<code>subscribeRaw</code> resubscribes right away. Within seconds a hash arrives again, so nothing visible changes.",
+          ],
+          [
+            "silent",
+            "silent > 30 s",
+            false,
+            "The watchdog (every 5 s) sees no hash for 30 s and marks <code>canvasInvalidation</code> unavailable. A new push makes it available again.",
+          ],
+          [
+            "error",
+            "errored / unexpected shape",
+            false,
+            "<code>failCanvas()</code> marks <code>canvasInvalidation</code> down for good. An error frame ends the subscription, so the page polls until nothing on screen watches that environment any more (you switch environment or navigate away) and the watch starts fresh next time.",
+          ],
+        ];
+        let conn = "connected",
+          canvas = "ok";
+        function render() {
+          $("#tt-conn").innerHTML = CONN.map(
+            ([k, l]) => `<button data-k="${k}" class="${k === conn ? "on" : ""}">${l}</button>`,
+          ).join("");
+          $("#tt-canvas").innerHTML = CANVAS.map(
+            ([k, l]) => `<button data-k="${k}" class="${k === canvas ? "on" : ""}">${l}</button>`,
+          ).join("");
+          $$("#tt-conn button").forEach(
+            (b) =>
+              (b.onclick = () => {
+                conn = b.dataset.k;
+                render();
+              }),
+          );
+          $$("#tt-canvas button").forEach(
+            (b) =>
+              (b.onclick = () => {
+                canvas = b.dataset.k;
+                render();
+              }),
+          );
+          const cv = CANVAS.find((c) => c[0] === canvas),
+            cn = CONN.find((c) => c[0] === conn);
+          const live = cv[2] && conn === "connected";
+          $("#tt-badge").innerHTML =
+            `<span class="badge ${live ? "live" : "poll"}">${live ? "● Live" : "Polling every 30s"}</span>`;
+          const v = $("#tt-why");
+          v.className = `verdict ${live ? "ok" : "warn"}`;
+          v.innerHTML = `<div style="font-family:var(--mono);font-size:.8rem;margin-bottom:8px">
+              canvasAvailable = <b class="${cv[2] ? "good" : "bad"}">${cv[2]}</b> · connection === "connected" = <b class="${conn === "connected" ? "good" : "bad"}">${conn === "connected"}</b><br>
+              mode = <b>"${live ? "live" : "polling"}"</b> → refetchInterval: <b>${live ? "false" : "30_000"}</b></div>
+            <p style="margin:4px 0"><b>Connection:</b> ${cn[2]}</p><p style="margin:4px 0"><b>canvasInvalidation:</b> ${cv[3]}</p>
+            ${conn === "signed-out" ? `<p style="margin:4px 0" class="bad">Polling won't help much here: <code>getProjectFn</code> goes through <code>requireRailway</code>, so the refetches fail with 401 too.</p>` : ""}
+            ${!live && conn === "connected" ? `<p style="margin:4px 0" class="muted"><code>deployment(id)</code> subscriptions may still be pushing. They still trigger refetches, but they can't see new deployments, which is why their pushes alone don't count as Live.</p>` : ""}`;
+        }
+        render();
+
+        const FAILS = [
+          [
+            "Railway ends <code>canvasInvalidation</code> after ~95 s (it always does)",
+            "resubscribe",
+            "Measured: <code>canvasInvalidation</code> completes after exactly 95 s, even on a direct connection. Before <code>subscribeRaw</code> handled this, tabs kept showing “Live” while missing every start made elsewhere. Stops still synced through <code>deployment(id)</code>, which made the bug easy to miss.",
+          ],
+          [
+            "…and it keeps ending immediately",
+            "back off 10 s",
+            "If a subscription lived under 10 s (<code>MIN_HEALTHY_LIFETIME_MS</code>), the next attempt waits 10 s instead of hammering Railway in a tight loop.",
+          ],
+          [
+            "<code>canvasInvalidation</code> goes quiet without saying anything",
+            "polling after 30 s",
+            "It once ended silently. The watchdog catches it: no hash for 30 s means it's treated as down until a push arrives.",
+          ],
+          [
+            "Railway changes the internal API",
+            "polling",
+            "The payload is hand-typed and validated with Zod. A shape mismatch or an error frame means <code>failCanvas()</code>, and polling every 30 s takes over.",
+          ],
+          [
+            "Wi-Fi drops / laptop sleeps",
+            "reconnect + refetch",
+            "graphql-ws retries forever (<code>retryAttempts: Infinity</code>). The badge shows polling meanwhile. On reconnect, all subscriptions are re-sent automatically, and <code>onReconnected</code> schedules a refetch for anything missed.",
+          ],
+          [
+            "Access token about to expire",
+            "close 1012 → reconnect",
+            "The relay closes the socket a minute early. The client's next attempt refreshes the cookie first (flow ⑤ above). The user sees, at most, a brief flip to polling.",
+          ],
+          [
+            "Railway closes the relay's upstream socket",
+            "close 1012 → reconnect",
+            "Upstreams never retry. The relay closes the browser socket instead, and the browser's reconnect rebuilds everything from scratch. That leaves one recovery path instead of two.",
+          ],
+          [
+            "User signs out / refresh token revoked",
+            "signed-out, stop retrying",
+            "<code>ensureLiveSession</code> returns <code>signedIn: false</code>, and <code>url()</code> throws a <code>SignedOutError</code>, which <code>shouldRetry</code> rejects. The upgrade would have been refused with 401 anyway.",
+          ],
+          [
+            "A <code>deployment(id)</code> subscription errors",
+            "ignored",
+            "<code>error: () => {}</code>. <code>canvasInvalidation</code> and the polling fallback already cover it, and per-deployment errors aren't actionable.",
+          ],
+          [
+            "Browser sends garbage or reuses an id",
+            "close 4400 / 4409",
+            "Zod rejects unknown messages (4400). Duplicate ids close with 4409. graphql-ws treats both as fatal. Only a buggy or hand-written client would ever see them.",
+          ],
+        ];
+        $("#faillist").innerHTML = FAILS.map(
+          ([t, r, b]) =>
+            `<details class="fail"><summary><span>${t}</span><span class="result">${r}</span></summary><div class="body">${b}</div></details>`,
+        ).join("");
+      })();
+
+      /* ================================================================ ch10: clocks */
+      (function clocks() {
+        let timers = [];
+        const badge = (k, label, secs) =>
+          `<span class="badge ${k}">${k === "pend" ? '<span class="spin"></span>' : ""}${label}${secs != null ? ` <span style="font-variant-numeric:tabular-nums">${secs}s</span>` : ""}</span>`;
+        function idle() {
+          $("#clk-a").innerHTML = badge("stop", "Stopped");
+          $("#clk-b").innerHTML = badge("stop", "Stopped");
+          $("#clk-a-ev").textContent = $("#clk-b-ev").textContent = "";
+        }
+        idle();
+        $("#clk-go").onclick = () => {
+          timers.forEach(clearTimeout);
+          timers.forEach(clearInterval);
+          timers = [];
+          const t0 = Date.now();
+          let shownA = 0;
+          $("#clk-a").innerHTML = badge("pend", "Deploying", 0);
+          $("#clk-b").innerHTML = badge("pend", "Deploying", 0);
+          $("#clk-a-ev").textContent = "event: QUEUED (re-render)";
+          $("#clk-b-ev").textContent = "event: QUEUED";
+          const iv = setInterval(() => {
+            const s = Math.round((Date.now() - t0) / 1000);
+            $("#clk-b").innerHTML = badge("pend", "Deploying", s);
+            $("#clk-b-ev").textContent = `local tick (1 s), no event · ${s}s`;
+          }, 1000);
+          timers.push(iv);
+          timers.push(
+            setTimeout(() => {
+              clearInterval(iv);
+              const s = Math.round((Date.now() - t0) / 1000);
+              $("#clk-a").innerHTML = badge("run", "Running");
+              $("#clk-b").innerHTML = badge("run", "Running");
+              $("#clk-a-ev").textContent =
+                `burst at ${s}s: CREATE_CONTAINER, CONFIGURE_NETWORK, SUCCESS`;
+              $("#clk-b-ev").textContent = `burst at ${s}s, ticker stops (no Elapsed mounted)`;
+            }, 14000),
+          );
+        };
+      })();
+
+      /* ================================================================ ch11: trade-offs */
+      const TRADEOFFS = [
+        [
+          "Relying on an internal API",
+          "<code>canvasInvalidation</code> is the only way to learn about deployments started elsewhere, but Railway doesn't document it and can change it any time. It's isolated: hand-typed, Zod-validated, routed by name in the relay, with polling as a fallback. <code>docs/realtime.md</code> suggests asking Railway for a public <code>environmentChanged</code> subscription.",
+        ],
+        [
+          "Refetch everything, every time",
+          "Any signal refetches the <em>whole</em> project. That's simple and can't drift out of sync, but it costs one Railway API request per change, per open tab. The planned next phase is a reducer that applies push payloads directly and falls back to a refetch when unsure.",
+        ],
+        [
+          "Query defaults are untouched",
+          "The <code>QueryClient</code> uses <code>staleTime: 0</code>, so data counts as stale as soon as it arrives. TanStack Query will refetch on mount after hydration and whenever the tab regains focus. That's harmless here, but a small <code>staleTime</code> would skip the redundant first request.",
+        ],
+        [
+          "Relay state lives in memory",
+          "The <code>connections</code> map belongs to one server process. That's fine for a single instance, and nothing needs to be shared across instances: each browser socket owns its own upstreams. Expect one browser socket and up to two Railway sockets per open tab.",
+        ],
+        [
+          "Polling fallback costs requests",
+          "30 s polling is 120 requests per hour per tab, against a Hobby limit of ~1,000/hour. Fine for a few tabs, but worth knowing if a page polls for long.",
+        ],
+        [
+          "Two ways to load data",
+          "The home page still uses plain loader data. The project page uses TanStack Query. Both work. Query is there because the project page needs a cache that can be invalidated and refetched from outside the component tree.",
+        ],
+      ];
+      $("#tradeoff-grid").innerHTML = TRADEOFFS.map(
+        ([t, b]) =>
+          `<div class="card"><h4 style="margin:0 0 6px">${t}</h4><p class="muted" style="font-size:.9rem;margin:0">${b}</p></div>`,
+      ).join("");
+
+      /* ================================================================ quiz */
+      const QUIZ = [
+        [
+          'A <code>deployment(id)</code> push arrives saying <code>status: "SUCCESS"</code>. What does the page do with that status?',
+          [
+            "Writes it into the cache entry for that service",
+            "Shows a toast",
+            "Ignores it unless the hash changed",
+            "Nothing with the status itself: it schedules a debounced refetch of the whole project",
+          ],
+          3,
+          "Pushes are signals. The refetch is the only thing that writes to the cache, so the page always shows what the server says.",
+        ],
+        [
+          "Why does the browser connect to <code>/api/live</code> instead of straight to Railway's WebSocket?",
+          [
+            "Railway's socket needs the access token, and the token must never reach browser JavaScript",
+            "Railway blocks browsers",
+            "WebSockets can't cross domains",
+            "To cache subscription results",
+          ],
+          0,
+          "The relay authenticates the browser with the httpOnly cookie, then puts the Bearer token in its <em>own</em> <code>connection_init</code> to Railway.",
+        ],
+        [
+          "Before the token expires, the relay closes the socket with code 1012, not 4401. Why?",
+          [
+            "1012 is shorter",
+            "4401 isn't a real close code",
+            "graphql-ws treats 4401 as fatal and stops, while 1012 makes it reconnect, which goes through the cookie refresh",
+            "Railway requires it",
+          ],
+          2,
+          "Reconnecting calls <code>url()</code>, which calls <code>ensureLiveSession</code>, which refreshes the cookie. The next upgrade then carries a fresh token.",
+        ],
+        [
+          "<code>canvasInvalidation</code> sends the hash <code>a1f3</code>, then <code>a1f3</code> again 8 s later. How many refetches?",
+          [
+            "Two",
+            "One. The first hash always counts as new, and a repeat is ignored",
+            "Zero, since the hash never changed",
+            "One every 8 s",
+          ],
+          1,
+          "<code>lastHash</code> starts as <code>undefined</code>, so the first push refetches (catching changes since the server render). Repeats only reset the watchdog.",
+        ],
+        [
+          "On a first visit, why doesn't the browser fetch the project before showing the page?",
+          [
+            "It's in localStorage",
+            "useSuspenseQuery skips fetching in production",
+            "The browser blocks until the WebSocket connects",
+            "The server ran the loader, rendered the HTML, and shipped the dehydrated cache along with it",
+          ],
+          3,
+          "<code>setupRouterSsrQueryIntegration</code> serializes the server's cache into the page. The browser's QueryClient starts out filled.",
+        ],
+        [
+          "Someone starts a stopped service from the CLI. Which signal tells your page first?",
+          [
+            "canvasInvalidation: the new deployment's ID isn't on screen yet, so no deployment(id) subscription exists for it",
+            "deployment(id), since you're subscribed to every deployment",
+            "Polling",
+            "The mutation's onSuccess",
+          ],
+          0,
+          "The <code>deployment(id)</code> subscriptions follow the data on screen. Only after the <code>canvasInvalidation</code>-triggered refetch reveals the new deployment does a <code>deployment(newId)</code> subscription start.",
+        ],
+      ];
+      let score = 0,
+        answered = 0;
+      $("#quizbox").innerHTML = QUIZ.map(
+        ([q, opts, , why], i) => `<div class="q card" data-q="${i}"><div><b>${i + 1}.</b> ${q}</div>
+  <div class="opts">${opts.map((o, j) => `<button data-j="${j}">${o}</button>`).join("")}</div><div class="why">${why}</div></div>`,
+      ).join("");
+      $$(".q").forEach((qel) => {
+        const i = +qel.dataset.q;
+        $$("button", qel).forEach(
+          (b) =>
+            (b.onclick = () => {
+              if (qel.classList.contains("answered")) return;
+              qel.classList.add("answered");
+              const j = +b.dataset.j,
+                right = QUIZ[i][2];
+              $$("button", qel)[right].classList.add("right");
+              if (j !== right) b.classList.add("wrong");
+              else score++;
+              answered++;
+              $("#quizscore").textContent =
+                answered === QUIZ.length
+                  ? `Score: ${score} / ${QUIZ.length}${score === QUIZ.length ? ". You could explain this to someone else now." : ""}`
+                  : "";
+            }),
+        );
+      });
+    </script>
+  </body>
+</html>

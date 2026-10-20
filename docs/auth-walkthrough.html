@@ -1,0 +1,2748 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How “Login with Railway” works — Console walkthrough</title>
+    <style>
+      :root {
+        --bg: #0d0f14;
+        --bg-2: #141821;
+        --bg-3: #1b2030;
+        --line: #2a3142;
+        --text: #e6e9ef;
+        --muted: #9aa3b5;
+        --faint: #6b7385;
+        --browser: #4cc2ff;
+        --server: #3ddc97;
+        --railway: #a78bfa;
+        --secret: #fbbf24;
+        --danger: #f87171;
+        --ok: #4ade80;
+        --radius: 14px;
+        --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+        --sans: ui-sans-serif, -apple-system, "Inter", "Segoe UI", system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 72px;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.65 var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: var(--browser);
+      }
+      code,
+      pre,
+      .mono {
+        font-family: var(--mono);
+        font-size: 0.86em;
+      }
+      :not(pre) > code {
+        background: var(--bg-3);
+        padding: 0.1em 0.4em;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        letter-spacing: -0.015em;
+      }
+      h2 {
+        font-size: 1.9rem;
+        margin: 0 0 0.4rem;
+      }
+      h3 {
+        font-size: 1.2rem;
+        margin: 1.6rem 0 0.4rem;
+      }
+      p {
+        margin: 0.5rem 0 0.9rem;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .b {
+        color: var(--browser);
+      }
+      .s {
+        color: var(--server);
+      }
+      .r {
+        color: var(--railway);
+      }
+      .k {
+        color: var(--secret);
+      }
+      .bad {
+        color: var(--danger);
+      }
+      .good {
+        color: var(--ok);
+      }
+
+      /* ---------- nav ---------- */
+      nav.top {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        backdrop-filter: blur(10px);
+        background: color-mix(in srgb, var(--bg) 82%, transparent);
+        border-bottom: 1px solid var(--line);
+      }
+      nav.top .inner {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: flex;
+        gap: 4px;
+        padding: 10px 20px;
+        overflow-x: auto;
+      }
+      nav.top a {
+        color: var(--muted);
+        text-decoration: none;
+        white-space: nowrap;
+        font-size: 0.85rem;
+        padding: 6px 10px;
+        border-radius: 8px;
+      }
+      nav.top a:hover {
+        color: var(--text);
+        background: var(--bg-3);
+      }
+      nav.top a.active {
+        color: var(--text);
+        background: var(--bg-3);
+      }
+      #progress {
+        position: absolute;
+        left: 0;
+        bottom: -1px;
+        height: 2px;
+        background: linear-gradient(90deg, var(--browser), var(--server), var(--railway));
+        width: 0;
+      }
+
+      section {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 72px 20px 24px;
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 0.72rem;
+        color: var(--faint);
+        font-weight: 600;
+      }
+      .lede {
+        font-size: 1.12rem;
+        color: var(--muted);
+        max-width: 760px;
+      }
+      .card {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 20px;
+      }
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+      .g2 {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      }
+      .g3 {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+      .g4 {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+      button,
+      .btn {
+        font: inherit;
+        font-size: 0.9rem;
+        color: var(--text);
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        padding: 8px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          transform 0.05s;
+      }
+      button:hover {
+        border-color: #3b4560;
+        background: #222839;
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      button.primary {
+        background: #e6e9ef;
+        color: #0d0f14;
+        border-color: #e6e9ef;
+        font-weight: 600;
+      }
+      button.primary:hover {
+        background: #fff;
+      }
+      button[aria-pressed="true"],
+      button.on {
+        border-color: var(--text);
+        background: #262d40;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--bg-3);
+        color: var(--muted);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      input[type="text"],
+      textarea {
+        width: 100%;
+        font: 0.85rem/1.5 var(--mono);
+        color: var(--text);
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        resize: vertical;
+      }
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--server);
+      }
+
+      /* ---------- code ---------- */
+      pre.code {
+        margin: 10px 0;
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+        overflow-x: auto;
+        line-height: 1.55;
+        font-size: 0.8rem;
+        position: relative;
+      }
+      pre.code .file {
+        display: block;
+        color: var(--faint);
+        font-size: 0.72rem;
+        margin-bottom: 8px;
+        letter-spacing: 0.02em;
+      }
+      .tk-kw {
+        color: #c792ea;
+      }
+      .tk-str {
+        color: #c3e88d;
+      }
+      .tk-com {
+        color: #6b7385;
+        font-style: italic;
+      }
+      .tk-num {
+        color: #f78c6c;
+      }
+      .tk-fn {
+        color: #82aaff;
+      }
+      .tk-ty {
+        color: #ffcb6b;
+      }
+      pre.code mark {
+        background: rgba(251, 191, 36, 0.13);
+        color: inherit;
+        border-radius: 3px;
+        box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.13);
+      }
+
+      /* ---------- hero ---------- */
+      .hero {
+        padding-top: 64px;
+      }
+      .hero h1 {
+        font-size: clamp(2.2rem, 5vw, 3.6rem);
+        margin: 8px 0 12px;
+      }
+      .hero h1 .grad {
+        background: linear-gradient(90deg, var(--browser), var(--server) 50%, var(--railway));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .cast {
+        margin-top: 28px;
+      }
+      .actor {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+      }
+      .actor .icon {
+        flex: none;
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+      }
+      .actor h4 {
+        margin: 0 0 2px;
+        font-size: 1rem;
+      }
+      .actor p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      /* valet analogy */
+      .analogy {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 12px;
+        align-items: stretch;
+      }
+      .analogy .cell {
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 0.92rem;
+      }
+      .analogy .arrow {
+        color: var(--faint);
+        align-self: center;
+        text-align: center;
+      }
+      @media (max-width: 700px) {
+        .analogy {
+          grid-template-columns: 1fr;
+        }
+        .analogy .arrow {
+          display: none;
+        }
+      }
+
+      /* ---------- file map ---------- */
+      .files {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 860px) {
+        .files {
+          grid-template-columns: 1fr;
+        }
+      }
+      .filelist {
+        display: grid;
+        gap: 4px;
+        align-content: start;
+      }
+      .filelist .group {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--faint);
+        margin: 12px 4px 4px;
+      }
+      .filelist button {
+        text-align: left;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        padding: 8px 10px;
+        background: transparent;
+        border-color: transparent;
+      }
+      .filelist button:hover {
+        background: var(--bg-3);
+      }
+      .filelist button.on {
+        background: var(--bg-3);
+        border-color: var(--line);
+      }
+      .tag {
+        font-family: var(--sans);
+        font-size: 0.66rem;
+        padding: 1px 7px;
+        border-radius: 999px;
+        border: 1px solid;
+      }
+      .tag.new {
+        color: var(--ok);
+        border-color: rgba(74, 222, 128, 0.35);
+      }
+      .tag.mod {
+        color: var(--secret);
+        border-color: rgba(251, 191, 36, 0.35);
+      }
+
+      /* ---------- sequence player ---------- */
+      .player {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 980px) {
+        .player {
+          grid-template-columns: 1fr;
+        }
+      }
+      .stage {
+        position: relative;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .stage svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .stage-scroll {
+        max-height: 640px;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      }
+      .lanes-head {
+        display: grid;
+        grid-template-columns: 30% 40% 30%;
+        text-align: center;
+        padding: 12px 0 8px;
+        border-bottom: 1px solid var(--line);
+        background: var(--bg-2);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      .lanes-head div {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .lanes-head small {
+        display: block;
+        font-weight: 400;
+        color: var(--faint);
+        font-size: 0.72rem;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        padding: 12px;
+        border-top: 1px solid var(--line);
+        background: var(--bg-2);
+      }
+      .controls .count {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 0.82rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin: 14px 0;
+      }
+      .detail {
+        position: sticky;
+        top: 76px;
+      }
+      .detail .step-title {
+        font-size: 1.15rem;
+        font-weight: 650;
+        margin: 6px 0 4px;
+      }
+      .envelope {
+        margin-top: 12px;
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: #0a0c10;
+        font: 0.76rem/1.6 var(--mono);
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: var(--muted);
+      }
+      .envelope .h {
+        color: var(--text);
+      }
+      .envelope .sec {
+        color: var(--secret);
+      }
+      .channel {
+        font-size: 0.72rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .channel.front {
+        background: rgba(76, 194, 255, 0.12);
+        color: var(--browser);
+      }
+      .channel.back {
+        background: rgba(251, 191, 36, 0.12);
+        color: var(--secret);
+      }
+      .channel.local {
+        background: rgba(61, 220, 151, 0.12);
+        color: var(--server);
+      }
+      .legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 10px;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend i {
+        display: inline-block;
+        width: 26px;
+        height: 0;
+        border-top: 2px solid;
+      }
+
+      svg .msg {
+        opacity: 0.28;
+        transition: opacity 0.35s;
+        cursor: pointer;
+      }
+      svg .msg.past {
+        opacity: 0.5;
+      }
+      svg .msg.current {
+        opacity: 1;
+      }
+      svg .msg text {
+        font: 15px var(--sans);
+        fill: var(--text);
+      }
+      svg .msg .num {
+        font: 600 11px var(--mono);
+        fill: var(--bg);
+      }
+      svg .msg.future {
+        opacity: 0.08;
+      }
+      svg .msg.current .draw {
+        stroke-dasharray: var(--len);
+        stroke-dashoffset: var(--len);
+        animation: draw 0.7s ease forwards;
+      }
+      @keyframes draw {
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+      svg .packet {
+        filter: drop-shadow(0 0 6px currentColor);
+      }
+
+      /* ---------- labs ---------- */
+      .lab {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 22px;
+        margin: 18px 0 28px;
+      }
+      .lab-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .lab-head h3 {
+        margin: 0;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 6px 14px;
+        font-size: 0.86rem;
+        align-items: baseline;
+      }
+      .kv .k2 {
+        color: var(--faint);
+      }
+      .kv .v {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        word-break: break-all;
+      }
+      .verdict {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        font-size: 0.92rem;
+        border: 1px solid var(--line);
+        background: var(--bg-3);
+        transition: all 0.25s;
+      }
+      .verdict.ok {
+        border-color: rgba(74, 222, 128, 0.4);
+        background: rgba(74, 222, 128, 0.07);
+      }
+      .verdict.no {
+        border-color: rgba(248, 113, 113, 0.45);
+        background: rgba(248, 113, 113, 0.07);
+      }
+      .verdict.warn {
+        border-color: rgba(251, 191, 36, 0.45);
+        background: rgba(251, 191, 36, 0.07);
+      }
+
+      .jwe {
+        font: 0.78rem/1.7 var(--mono);
+        word-break: break-all;
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+        min-height: 64px;
+      }
+      .jwe span {
+        border-radius: 3px;
+      }
+      .jwe .p0 {
+        color: #82aaff;
+      }
+      .jwe .p1 {
+        color: var(--faint);
+      }
+      .jwe .p2 {
+        color: #f78c6c;
+      }
+      .jwe .p3 {
+        color: var(--secret);
+      }
+      .jwe .p4 {
+        color: #c792ea;
+      }
+      .jwe .flip {
+        background: var(--danger);
+        color: #000;
+      }
+      .seg-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 0.78rem;
+        margin-top: 8px;
+        color: var(--muted);
+      }
+
+      /* battery */
+      .battery {
+        position: relative;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: #0a0c10;
+        overflow: hidden;
+      }
+      .battery .fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: linear-gradient(90deg, var(--server), #2bb57b);
+        transition:
+          width 0.2s,
+          background 0.2s;
+      }
+      .battery .zone {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: calc(100% / 60);
+        background: repeating-linear-gradient(
+          45deg,
+          rgba(248, 113, 113, 0.35) 0 4px,
+          transparent 4px 8px
+        );
+      }
+      .battery .label {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font: 600 0.82rem var(--mono);
+        color: #fff;
+        text-shadow: 0 1px 2px #000;
+      }
+
+      /* flip cards */
+      .flipcard {
+        perspective: 900px;
+        min-height: 210px;
+        cursor: pointer;
+      }
+      .flipcard .inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        min-height: 210px;
+        transition: transform 0.55s;
+        transform-style: preserve-3d;
+      }
+      .flipcard.flipped .inner {
+        transform: rotateY(180deg);
+      }
+      .flipcard .face {
+        position: absolute;
+        inset: 0;
+        backface-visibility: hidden;
+        border-radius: var(--radius);
+        border: 1px solid var(--line);
+        background: var(--bg-2);
+        padding: 18px;
+      }
+      .flipcard .back {
+        transform: rotateY(180deg);
+        background: #1a1414;
+        border-color: rgba(248, 113, 113, 0.35);
+      }
+      .flipcard h4 {
+        margin: 0 0 6px;
+        font-family: var(--mono);
+        font-size: 0.95rem;
+      }
+      .flipcard p {
+        font-size: 0.88rem;
+        color: var(--muted);
+        margin: 0;
+      }
+      .flipcard .hint {
+        position: absolute;
+        bottom: 12px;
+        right: 14px;
+        font-size: 0.72rem;
+        color: var(--faint);
+      }
+
+      /* boundary */
+      .boundary {
+        display: grid;
+        grid-template-columns: 1fr 70px 1fr;
+        align-items: stretch;
+      }
+      .boundary .side {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 18px;
+      }
+      .boundary .wall {
+        display: grid;
+        place-items: center;
+      }
+      .boundary .wall div {
+        width: 6px;
+        height: 100%;
+        border-radius: 4px;
+        background: repeating-linear-gradient(180deg, var(--secret) 0 10px, transparent 10px 18px);
+        opacity: 0.7;
+      }
+      .chip {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 12px;
+        margin: 6px 0;
+        border-radius: 10px;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        font-size: 0.86rem;
+      }
+      .chip small {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+      }
+      @media (max-width: 760px) {
+        .boundary {
+          grid-template-columns: 1fr;
+        }
+        .boundary .wall {
+          height: 30px;
+        }
+        .boundary .wall div {
+          width: 100%;
+          height: 6px;
+          background: repeating-linear-gradient(90deg, var(--secret) 0 10px, transparent 10px 18px);
+        }
+      }
+      .devtools {
+        margin-top: 14px;
+        background: #0a0c10;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font: 0.8rem/1.6 var(--mono);
+        padding: 12px;
+        min-height: 90px;
+        white-space: pre-wrap;
+      }
+      .devtools .prompt {
+        color: var(--browser);
+      }
+
+      /* failures */
+      .fail-list {
+        display: grid;
+        gap: 8px;
+      }
+      details.fail {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0 16px;
+      }
+      details.fail summary {
+        cursor: pointer;
+        padding: 14px 0;
+        list-style: none;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        font-weight: 550;
+      }
+      details.fail summary::-webkit-details-marker {
+        display: none;
+      }
+      details.fail summary::after {
+        content: "+";
+        color: var(--faint);
+        font-size: 1.2rem;
+      }
+      details.fail[open] summary::after {
+        content: "–";
+      }
+      details.fail .body {
+        padding-bottom: 14px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      .result {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        white-space: nowrap;
+      }
+
+      /* quiz */
+      .q {
+        margin: 16px 0;
+      }
+      .q .opts {
+        display: grid;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .q .opts button {
+        text-align: left;
+      }
+      .q .opts button.right {
+        border-color: var(--ok);
+        background: rgba(74, 222, 128, 0.1);
+      }
+      .q .opts button.wrong {
+        border-color: var(--danger);
+        background: rgba(248, 113, 113, 0.08);
+      }
+      .q .why {
+        font-size: 0.88rem;
+        color: var(--muted);
+        margin-top: 6px;
+        display: none;
+      }
+      .q.answered .why {
+        display: block;
+      }
+
+      footer {
+        max-width: 1180px;
+        margin: 40px auto 0;
+        padding: 30px 20px 60px;
+        color: var(--faint);
+        font-size: 0.85rem;
+        border-top: 1px solid var(--line);
+      }
+
+      .fade-in {
+        animation: fadein 0.4s ease;
+      }
+      @keyframes fadein {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="top">
+      <div class="inner">
+        <a href="#intro">Intro</a>
+        <a href="#idea">The big idea</a>
+        <a href="#files">What changed</a>
+        <a href="#flow">The flow</a>
+        <a href="#state">state</a>
+        <a href="#pkce">PKCE</a>
+        <a href="#cookie">Session cookie</a>
+        <a href="#flags">Cookie flags</a>
+        <a href="#clock">Token clock</a>
+        <a href="#boundary">Server boundary</a>
+        <a href="#fail">When it breaks</a>
+        <a href="#tradeoffs">Trade-offs</a>
+        <a href="#quiz">Quiz</a>
+      </div>
+      <div id="progress"></div>
+    </nav>
+
+    <!-- ============================================================ INTRO -->
+    <section id="intro" class="hero">
+      <div class="eyebrow">apps/console · commit b233bf9 “implement oauth”</div>
+      <h1>How <span class="grad">“Login with Railway”</span> works</h1>
+      <p class="lede">
+        Console doesn't have its own accounts or passwords. Railway signs the user in, and the user
+        decides which Railway projects Console may manage. Console gets a token it can use to call
+        Railway's API for that user, and keeps the token in an encrypted cookie that only the server
+        can read.
+      </p>
+      <p class="muted">
+        This page walks through that one sentence slowly. Click, drag, and break things along the
+        way.
+      </p>
+
+      <div class="grid g3 cast">
+        <div class="card actor">
+          <div class="icon" style="background: rgba(76, 194, 255, 0.14)">🧑‍💻</div>
+          <div>
+            <h4 class="b">Browser</h4>
+            <p>
+              The user and their browser. It follows redirects and stores cookies, but we treat it
+              as a place where secrets must <em>not</em> live.
+            </p>
+          </div>
+        </div>
+        <div class="card actor">
+          <div class="icon" style="background: rgba(61, 220, 151, 0.14)">🖥️</div>
+          <div>
+            <h4 class="s">Console server</h4>
+            <p>
+              Our TanStack Start app (<code>localhost:3000</code>). It holds the secrets and is the
+              only party that ever sees Railway tokens.
+            </p>
+          </div>
+        </div>
+        <div class="card actor">
+          <div class="icon" style="background: rgba(167, 139, 250, 0.14)">🚂</div>
+          <div>
+            <h4 class="r">Railway</h4>
+            <p>
+              Two roles: the <b>authorization server</b> (login and consent screen, issues tokens)
+              and the <b>GraphQL API</b> (accepts those tokens).
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ BIG IDEA -->
+    <section id="idea">
+      <div class="eyebrow">Chapter 1</div>
+      <h2>The big idea: a valet key, not your car keys</h2>
+      <p class="lede">
+        OAuth exists so that one app can act on your behalf at another service
+        <em>without ever learning your password</em>. The usual analogy is a valet key: it starts
+        the car, but it won't open the trunk, and you can take it back.
+      </p>
+
+      <div class="card" style="margin-top: 18px">
+        <div class="analogy">
+          <div class="eyebrow">Valet parking</div>
+          <div></div>
+          <div class="eyebrow">This codebase</div>
+          <div class="cell">You (the car owner)</div>
+          <div class="arrow">→</div>
+          <div class="cell"><span class="b">The user</span>, signed in to Railway</div>
+          <div class="cell">The valet</div>
+          <div class="arrow">→</div>
+          <div class="cell"><span class="s">Console</span> (the “OAuth client”)</div>
+          <div class="cell">The car's manufacturer, who cuts keys</div>
+          <div class="arrow">→</div>
+          <div class="cell">
+            <span class="r">Railway's OAuth server</span> at
+            <code>backboard.railway.com/oauth</code>
+          </div>
+          <div class="cell">The valet key (only certain things)</div>
+          <div class="arrow">→</div>
+          <div class="cell">
+            <span class="k">Access token</span> limited by <b>scopes</b> + the projects the user
+            picked
+          </div>
+          <div class="cell">You hand the valet the key yourself</div>
+          <div class="arrow">→</div>
+          <div class="cell">The <b>consent screen</b>, where the user clicks “Allow”</div>
+        </div>
+      </div>
+
+      <h3>The scopes Console asks for</h3>
+      <p>
+        Scopes are the list of things on the valet key. They're set in
+        <code>railway-oauth.ts</code>:
+      </p>
+      <div class="grid g4" id="scopes"></div>
+      <p class="muted" style="margin-top: 14px">
+        Because of <code>project:member</code>, the token only covers the projects the user ticked.
+        That's why <code>viewer.ts</code> queries <code>externalWorkspaces</code> (“what was shared
+        with me?”) and not <code>projects</code>, which this kind of token isn't allowed to call.
+      </p>
+    </section>
+
+    <!-- ============================================================ FILES -->
+    <section id="files">
+      <div class="eyebrow">Chapter 2</div>
+      <h2>What changed</h2>
+      <p class="lede">
+        Three new URLs, three new server modules, a rewritten home page, and some new dependencies.
+        Click a file to see what it does.
+      </p>
+      <div class="files" style="margin-top: 18px">
+        <div class="filelist card" id="filelist" style="padding: 10px"></div>
+        <div class="card" id="filedetail"></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ FLOW -->
+    <section id="flow">
+      <div class="eyebrow">Chapter 3</div>
+      <h2>The whole flow, one message at a time</h2>
+      <p class="lede">
+        Each arrow is one HTTP request or response. Press <kbd>→</kbd> / <kbd>←</kbd> (or the
+        buttons) to step through, or click any arrow to jump to it. Watch which messages pass
+        <em>through the browser</em> and which go straight between servers.
+      </p>
+      <div class="tabs" id="flowtabs">
+        <button data-flow="login" class="on">① First login</button>
+        <button data-flow="refresh">② Coming back 2 hours later</button>
+        <button data-flow="logout">③ Logging out</button>
+      </div>
+      <div class="player">
+        <div>
+          <div class="stage">
+            <div class="stage-scroll" id="stageScroll">
+              <div class="lanes-head">
+                <div class="b">🧑‍💻 Browser<small>front channel: visible in the URL bar</small></div>
+                <div class="s">🖥️ Console server<small>holds the secrets</small></div>
+                <div class="r">🚂 Railway<small>OAuth + GraphQL API</small></div>
+              </div>
+              <svg id="seq" viewBox="0 0 800 400" preserveAspectRatio="xMidYMin meet"></svg>
+            </div>
+            <div class="controls">
+              <button id="prev">← Back</button>
+              <button id="next" class="primary">Next →</button>
+              <button id="play">▶ Play</button>
+              <button id="reset">Restart</button>
+              <span class="count" id="count"></span>
+            </div>
+          </div>
+          <div class="legend">
+            <span
+              ><i style="border-color: var(--browser)"></i>front channel (redirects through the
+              browser)</span
+            >
+            <span
+              ><i style="border-color: var(--secret); border-top-style: dashed"></i>back channel
+              (server ↔ server, the browser never sees it)</span
+            >
+            <span
+              ><i style="border-color: var(--server); border-top-style: dotted"></i>work done inside
+              one box</span
+            >
+          </div>
+        </div>
+        <div class="card detail" id="stepdetail"></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ STATE -->
+    <section id="state">
+      <div class="eyebrow">Chapter 4 · Deep dive</div>
+      <h2><code>state</code>: “is this the login <em>I</em> started?”</h2>
+      <p class="lede">
+        The callback URL <code>/auth/callback?code=…</code> is just a link. Anyone can craft one and
+        get someone else to open it. The <code>state</code> value makes sure Console only finishes
+        logins that <em>this browser</em> started in the last 10 minutes.
+      </p>
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: try to slip someone a login link</h3>
+          <div class="tabs" style="margin: 0">
+            <button id="st-normal" class="on">Normal login</button>
+            <button id="st-attack">Attacker's link</button>
+            <button id="st-stale">Clicked Back to an old callback</button>
+          </div>
+        </div>
+        <p class="muted" id="st-story"></p>
+        <div class="grid g2">
+          <div class="card" style="background: var(--bg-3)">
+            <div class="eyebrow">Cookie in the browser (set by /auth/login)</div>
+            <div class="kv" style="margin-top: 8px">
+              <span class="k2">railway_oauth_state</span><span class="v" id="st-cookie"></span>
+            </div>
+          </div>
+          <div class="card" style="background: var(--bg-3)">
+            <div class="eyebrow">URL Railway redirected to</div>
+            <div class="kv" style="margin-top: 8px">
+              <span class="k2">?state=</span><span class="v" id="st-url"></span>
+            </div>
+          </div>
+        </div>
+        <div class="verdict" id="st-verdict"></div>
+        <pre
+          class="code"
+          data-file="apps/console/src/railway/railway-oauth.ts — finishLogin()"
+        >const expectedState = getCookie(STATE_COOKIE);
+const codeVerifier = getCookie(VERIFIER_COOKIE);
+deleteCookie(STATE_COOKIE, cookieDefaults());     // one use only, even if the checks below fail
+deleteCookie(VERIFIER_COOKIE, cookieDefaults());
+// …
+<mark>if (!code || !state || !expectedState || !codeVerifier || state !== expectedState) {</mark>
+  return { ok: false, status: 400, message: "Invalid or expired sign-in attempt. Try again." };
+}</pre>
+        <p class="muted" style="font-size: 0.9rem">
+          This attack is called <b>login CSRF</b>. If it worked, you'd land in Console signed in as
+          the <em>attacker</em>, and anything you did there (say, deploying your own code into
+          “your” project) would actually happen in the attacker's account.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================ PKCE -->
+    <section id="pkce">
+      <div class="eyebrow">Chapter 5 · Deep dive</div>
+      <h2>PKCE: proving you're the one who asked</h2>
+      <p class="lede">
+        The authorization <code>code</code> travels through the URL bar, so it can leak through
+        browser history, logs, or extensions. PKCE (“pixy”, Proof Key for Code Exchange) ties the
+        code to a secret that only Console holds. A leaked code is useless without it.
+      </p>
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: a real verifier and challenge, computed in your browser</h3>
+          <button id="pk-gen" class="primary">Generate a new verifier</button>
+        </div>
+        <p class="muted">
+          Same algorithm as arctic's <code>generateCodeVerifier()</code> and
+          <code>CodeChallengeMethod.S256</code>: 32 random bytes, then
+          <code>base64url(SHA-256(verifier))</code>.
+        </p>
+        <div class="grid g2">
+          <div class="card" style="background: var(--bg-3)">
+            <div class="eyebrow k">🔒 code_verifier: stays with Console</div>
+            <p class="mono" id="pk-ver" style="word-break: break-all; margin: 8px 0"></p>
+            <p class="muted" style="font-size: 0.85rem; margin: 0">
+              Kept in the httpOnly <code>railway_oauth_verifier</code> cookie and only sent to
+              Railway in step ⑪, over the back channel.
+            </p>
+          </div>
+          <div class="card" style="background: var(--bg-3)">
+            <div class="eyebrow b">🌐 code_challenge: public, goes in the URL</div>
+            <p class="mono" id="pk-chal" style="word-break: break-all; margin: 8px 0"></p>
+            <p class="muted" style="font-size: 0.85rem; margin: 0">
+              Sent in step ⑥. Railway stores it next to the code it's about to issue.
+            </p>
+          </div>
+        </div>
+        <h3>Pretend you're an attacker who stole the <code>code</code></h3>
+        <p class="muted">
+          You also saw the challenge in the URL. Railway will only hand out tokens if
+          <code>SHA-256(your guess) === challenge</code>. Try a guess:
+        </p>
+        <div style="display: flex; gap: 8px">
+          <input
+            type="text"
+            id="pk-guess"
+            placeholder="type a guess, or paste the challenge itself…"
+          /><button id="pk-try">Redeem code</button>
+        </div>
+        <div class="verdict" id="pk-verdict">Railway's token endpoint is waiting…</div>
+        <p class="muted" style="font-size: 0.9rem; margin-top: 14px">
+          SHA-256 is one-way, so knowing the challenge doesn't help you work out the verifier.
+          (Console also sends its <b>client secret</b> when exchanging the code, which is a second
+          lock. PKCE is still recommended for every client, and OAuth 2.1 requires it.)
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================ COOKIE -->
+    <section id="cookie">
+      <div class="eyebrow">Chapter 6 · Deep dive</div>
+      <h2>The session cookie: a locked box only the server can open</h2>
+      <p class="lede">
+        After login, Console needs to remember the user's Railway tokens. Most apps keep a
+        <em>sessions table</em> in a database and put a random ID in the cookie. This code skips the
+        database: it puts the tokens <em>in</em> the cookie, encrypted, so the browser carries a box
+        it can't open.
+      </p>
+      <div class="grid g2">
+        <div class="card">
+          <div class="eyebrow">Option A: database session (not used here)</div>
+          <p style="margin-top: 8px">
+            Cookie: <code>sid=8f3a…</code>, a random pointer.<br />Server: looks up row
+            <code>8f3a…</code> → tokens.
+          </p>
+          <p class="muted" style="font-size: 0.88rem">
+            Needs a database. You can list sessions and revoke them on the server.
+          </p>
+        </div>
+        <div class="card" style="border-color: rgba(61, 220, 151, 0.4)">
+          <div class="eyebrow s">Option B: encrypted cookie (this code)</div>
+          <p style="margin-top: 8px">
+            Cookie: <code>railway_session=eyJhbGciOiJkaXIi…</code>, the tokens themselves,
+            encrypted.<br />Server: decrypts it with <code>SESSION_SECRET</code>.
+          </p>
+          <p class="muted" style="font-size: 0.88rem">
+            No database. Every request carries its own state. Revoking a single session is harder
+            (see Trade-offs).
+          </p>
+        </div>
+      </div>
+
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: encrypt a session exactly like <code>writeSession()</code></h3>
+          <span class="pill"
+            >JWE · alg <code>dir</code> · enc <code>A256GCM</code> · real WebCrypto</span
+          >
+        </div>
+        <div class="grid g2" style="margin-top: 12px">
+          <div>
+            <label class="eyebrow">SESSION_SECRET (server env, ≥ 32 chars)</label>
+            <input type="text" id="jw-secret" value="dev-only-secret-please-change-me-0123456789" />
+            <div id="jw-secretmsg" style="font-size: 0.8rem; margin-top: 4px" class="muted"></div>
+            <label class="eyebrow" style="display: block; margin-top: 12px"
+              >Session payload (what's inside the box)</label
+            >
+            <textarea id="jw-payload" rows="7"></textarea>
+            <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap">
+              <button id="jw-enc" class="primary">🔒 Encrypt → Set-Cookie</button>
+            </div>
+          </div>
+          <div>
+            <label class="eyebrow">The cookie value the browser stores</label>
+            <div class="jwe" id="jw-out"><span class="muted">Press Encrypt…</span></div>
+            <div class="seg-legend">
+              <span class="p0" style="color: #82aaff">■ header (readable)</span>
+              <span style="color: var(--faint)">■ key (empty for “dir”)</span>
+              <span style="color: #f78c6c">■ IV (random each time)</span>
+              <span style="color: var(--secret)">■ ciphertext</span>
+              <span style="color: #c792ea">■ auth tag</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap">
+              <button id="jw-dec">🔓 Next request: readSession()</button>
+              <button id="jw-tamper">😈 Flip one character</button>
+              <button id="jw-peek">👀 Just base64-decode it</button>
+            </div>
+            <div class="verdict" id="jw-verdict">The server hasn't read anything yet.</div>
+          </div>
+        </div>
+        <p class="muted" style="font-size: 0.9rem; margin-top: 14px">
+          Two properties matter here. <b>Confidentiality:</b> without the secret, nobody can read
+          the Railway tokens inside. <b>Integrity:</b> AES-GCM's auth tag means any edit, even one
+          bit, makes decryption fail, so nobody can forge or modify a session. Try encrypting the
+          same payload twice: the output changes every time because the IV is random.
+        </p>
+        <pre
+          class="code"
+          data-file="apps/console/src/server/session.ts"
+        >async function encryptionKey() {
+  // SHA-256 squeezes any-length SESSION_SECRET into exactly the 32 bytes AES-256 needs
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(env.SESSION_SECRET));
+  return new Uint8Array(digest);
+}
+
+export async function readSession() {
+  return decryptSession(getCookie(SESSION_COOKIE));
+}
+
+async function decryptSession(token) {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtDecrypt(token, await encryptionKey());
+    return Session.parse(payload.session);   // zod: also rejects old/unknown shapes
+  } catch {
+    <mark>return null;                              // tampered, expired, wrong secret → "signed out"</mark>
+  }
+}</pre>
+      </div>
+    </section>
+
+    <!-- ============================================================ FLAGS -->
+    <section id="flags">
+      <div class="eyebrow">Chapter 7 · Deep dive</div>
+      <h2>Cookie flags: what each one is for</h2>
+      <p class="lede">
+        All three cookies (<code>railway_session</code>, <code>railway_oauth_state</code>,
+        <code>railway_oauth_verifier</code>) share <code>cookieDefaults()</code>. Click a card to
+        see what goes wrong without that flag.
+      </p>
+      <div class="grid g4" id="flagcards" style="margin-top: 16px"></div>
+      <pre class="code" data-file="apps/console/src/server/session.ts">
+export const cookieDefaults = () => ({
+  httpOnly: true,
+  secure: env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+});</pre>
+    </section>
+
+    <!-- ============================================================ CLOCK -->
+    <section id="clock">
+      <div class="eyebrow">Chapter 8 · Deep dive</div>
+      <h2>The token clock: why there are two tokens</h2>
+      <p class="lede">
+        The <span class="k">access token</span> is what Railway's API accepts, and it expires after
+        an hour so a leaked one doesn't stay useful for long. The
+        <span class="k">refresh token</span> lasts longer and can only be used at the token
+        endpoint, together with the client secret, to get a new access token.
+        <code>getFreshSession()</code> runs on every page load and handles the switch.
+      </p>
+      <div class="lab">
+        <div class="lab-head">
+          <h3>Lab: drag time forward</h3>
+          <span class="pill" id="ck-time"></span>
+        </div>
+        <input
+          type="range"
+          id="ck-slider"
+          min="0"
+          max="80"
+          step="0.5"
+          value="5"
+          style="margin: 14px 0 8px"
+        />
+        <div class="battery">
+          <div class="fill" id="ck-fill"></div>
+          <div class="zone" title="refresh margin: last 60s"></div>
+          <div class="label" id="ck-label"></div>
+        </div>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            color: var(--faint);
+            margin-top: 4px;
+          "
+        >
+          <span>token issued</span
+          ><span>expires after 60 min · striped = last 60 s (REFRESH_MARGIN_MS)</span>
+        </div>
+        <div style="display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 0.9rem">
+          <label><input type="checkbox" id="ck-hasrt" checked /> Session has a refresh token</label>
+          <label><input type="checkbox" id="ck-rtok" checked /> Railway accepts the refresh</label>
+        </div>
+        <div class="verdict" id="ck-verdict"></div>
+        <pre
+          class="code"
+          id="ck-code"
+          data-file="apps/console/src/railway/railway-oauth.ts — getFreshSession()"
+        ></pre>
+        <p class="muted" style="font-size: 0.9rem">
+          Why <code>prompt=consent</code> and <code>offline_access</code>? Railway only issues a
+          refresh token when you request <code>offline_access</code> <em>and</em> the consent screen
+          is shown explicitly. Without one, the user would have to log in again every hour. Each
+          successful refresh also rewrites the cookie with a new 30-day <code>maxAge</code>, so
+          regular users effectively stay signed in.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================ BOUNDARY -->
+    <section id="boundary">
+      <div class="eyebrow">Chapter 9 · Deep dive</div>
+      <h2>The server boundary: what actually reaches the browser</h2>
+      <p class="lede">
+        <code>createServerFn</code> marks code that <em>only runs on the server</em>. On the first
+        page load the loader calls it directly during server rendering. On a later client-side
+        navigation, TanStack Start turns the call into a <code>fetch</code> to the server. Either
+        way, the browser gets only the <code>return</code> value.
+      </p>
+      <div class="boundary" style="margin-top: 18px">
+        <div class="side">
+          <div class="eyebrow s">🖥️ Server only</div>
+          <div class="chip"><span>Client secret</span><small>env</small></div>
+          <div class="chip"><span>SESSION_SECRET</span><small>env</small></div>
+          <div class="chip"><span>Decrypted session</span><small>readSession()</small></div>
+          <div class="chip"><span>Access token</span><small>Bearer → Railway</small></div>
+          <div class="chip"><span>Refresh token</span><small>→ /oauth/token</small></div>
+          <div class="chip">
+            <span>Railway GraphQL calls</span><small>createRailwayClient</small>
+          </div>
+        </div>
+        <div class="wall"><div></div></div>
+        <div class="side">
+          <div class="eyebrow b">🧑‍💻 Browser</div>
+          <div class="chip"><span>Encrypted cookie blob</span><small>httpOnly, opaque</small></div>
+          <div class="chip">
+            <span><code>{ user: { name, email } }</code></span
+            ><small>getViewer() return</small>
+          </div>
+          <div class="chip">
+            <span><code>{ workspaces: [{ id, name, projects }] }</code></span
+            ><small>getViewer() return</small>
+          </div>
+          <div class="chip"><span>Rendered HTML</span><small>Home component</small></div>
+          <p class="muted" style="font-size: 0.85rem; margin-top: 10px">
+            Try it: run these the way you would in DevTools.
+          </p>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap">
+            <button data-dt="cookie">document.cookie</button>
+            <button data-dt="data">loader data</button>
+            <button data-dt="fetch">fetch Railway directly</button>
+          </div>
+          <div class="devtools" id="devtools">
+            <span class="muted">// console output appears here</span>
+          </div>
+        </div>
+      </div>
+      <pre
+        class="code"
+        data-file="apps/console/src/routes/index.tsx + apps/console/src/railway/viewer.ts"
+      >const getViewer = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await getFreshSession();      // decrypt cookie, refresh if needed
+  if (!session) return null;                     // → Home renders "Login with Railway"
+
+  return fetchViewer(createRailwayClient(session.accessToken));
+});
+
+export const Route = createFileRoute("/")({
+  loader: () => getViewer(),
+  component: Home,
+});
+
+// railway/viewer.ts
+export async function fetchViewer(railway: RailwayClient) {
+  const { me, externalWorkspaces } = await railway(ViewerQuery);
+  <mark>return { user: me, workspaces: externalWorkspaces };   // ← the only thing that crosses the wall</mark>
+}</pre>
+      <p class="muted" style="font-size: 0.9rem">
+        The GraphQL query is typed end-to-end by <b>gql.tada</b>: <code>ViewerQuery</code> (in
+        <code>viewer.ts</code>) is checked against Railway's schema at compile time, so
+        <code>viewer.workspaces[0].projects[0].name</code> autocompletes.
+        <code>railway-api.ts</code> is a thin <code>fetch</code> that adds the
+        <code>Bearer</code> header and turns GraphQL <code>errors</code> into thrown exceptions.
+      </p>
+    </section>
+
+    <!-- ============================================================ FAIL -->
+    <section id="fail">
+      <div class="eyebrow">Chapter 10</div>
+      <h2>When things go wrong</h2>
+      <p class="lede">Every failure path in the new code, and what the user sees.</p>
+      <div class="fail-list" id="faillist" style="margin-top: 16px"></div>
+    </section>
+
+    <!-- ============================================================ TRADEOFFS -->
+    <section id="tradeoffs">
+      <div class="eyebrow">Chapter 11</div>
+      <h2>Trade-offs and things to know</h2>
+      <p class="lede">
+        None of these are bugs today. They're consequences of choices in the design that are worth
+        knowing before you build on top of it.
+      </p>
+      <div class="grid g2" style="margin-top: 16px">
+        <div class="card">
+          <h3 style="margin-top: 0">🚪 Logout is local</h3>
+          <p class="muted">
+            “Log out” deletes the cookie in <em>this</em> browser. The Railway tokens aren't
+            revoked, though only the server ever held them. With no session table, there's also no
+            “sign out everywhere” except rotating <code>SESSION_SECRET</code>, which signs out
+            <em>everyone</em>. arctic has a <code>revokeToken()</code> if you want to revoke at
+            Railway on logout.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top: 0">🏁 Two tabs refreshing at once</h3>
+          <p class="muted">
+            If two requests arrive in the last minute before expiry, both will refresh. This can
+            even happen within one page load: the root route's loader (<code>getSignedIn</code> in
+            <code>__root.tsx</code>) and the home loader each call <code>getFreshSession()</code>,
+            and TanStack Router runs them in parallel. If Railway rotates refresh tokens and rejects
+            reuse of an old one, the slower call fails and that part of the render shows signed-out.
+            The cookie written by the other call survives, so the next load is fine.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top: 0">🔑 SESSION_SECRET must be random</h3>
+          <p class="muted">
+            The key is a single SHA-256 of the secret, not a slow password hash. That's fine for a
+            long random string (<code>openssl rand -base64 32</code>) and weak for a memorable
+            phrase. The zod schema only enforces length ≥ 32.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top: 0">📏 Cookies max out around 4 KB</h3>
+          <p class="muted">
+            Browsers cap each cookie at about 4 KB. Two tokens plus JWE overhead fits easily today.
+            If you later add the ID token or user profile to the session, watch the size.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top: 0">🌍 APP_URL must match exactly</h3>
+          <p class="muted">
+            The redirect URI is built from <code>APP_URL + "/auth/callback"</code> and has to match
+            what's registered on the Railway OAuth app, character for character. Each deploy URL
+            (preview, prod) needs its own entry.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top: 0">♻️ Failed refresh leaves the stale cookie</h3>
+          <p class="muted">
+            When a refresh fails, <code>getFreshSession()</code> returns <code>null</code> but
+            doesn't clear the cookie, so each page load retries the refresh until the user logs in
+            again. That's harmless, just one wasted request per load.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ QUIZ -->
+    <section id="quiz">
+      <div class="eyebrow">Chapter 12</div>
+      <h2>Check yourself</h2>
+      <p class="lede">Five questions. Click an answer to see why.</p>
+      <div id="quizbox"></div>
+      <p class="muted" id="quizscore"></p>
+    </section>
+
+    <footer>
+      Generated from the working tree of <code>container-thing</code> (apps/console). Code snippets
+      are trimmed copies of the real files. Open the files for the full versions.
+    </footer>
+
+    <script>
+      /* ================================================================ helpers */
+      const $ = (s, r = document) => r.querySelector(s);
+      const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+      const esc = (s) =>
+        s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+
+      function highlight(src) {
+        // tiny single-pass TS highlighter; <mark> survives as private-use placeholders
+        const out = esc(src.replace(/<mark>/g, "").replace(/<\/mark>/g, ""));
+        const re =
+          /(\/\/[^\n]*)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`)|\b(import|from|export|const|let|async|await|return|if|else|try|catch|throw|new|function|type|as|null|true|false|typeof)\b|\b(\d[\d_]*)\b|\b([A-Z][A-Za-z0-9]+)\b|\b([a-z_$][\w$]*)(?=\()/g;
+        const cls = ["com", "str", "kw", "num", "ty", "fn"];
+        return out
+          .replace(
+            re,
+            (m, ...g) =>
+              `<span class="tk-${cls[g.slice(0, 6).findIndex((x) => x !== undefined)]}">${m}</span>`,
+          )
+          .replace(//g, "<mark>")
+          .replace(//g, "</mark>");
+      }
+      function renderCode(el) {
+        const file = el.dataset.file;
+        const raw =
+          el.dataset.raw ??
+          el.innerHTML.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+        el.dataset.raw = raw;
+        el.innerHTML = (file ? `<span class="file">${esc(file)}</span>` : "") + highlight(raw);
+      }
+      $$("pre.code").forEach(renderCode);
+      function codeBlock(src, file) {
+        const pre = document.createElement("pre");
+        pre.className = "code";
+        if (file) pre.dataset.file = file;
+        pre.dataset.raw = src;
+        renderCode(pre);
+        return pre.outerHTML;
+      }
+
+      /* ================================================================ nav progress */
+      const sections = $$("section");
+      const navLinks = $$("nav.top a");
+      addEventListener(
+        "scroll",
+        () => {
+          const h = document.documentElement;
+          $("#progress").style.width =
+            (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100 + "%";
+          let cur = sections[0].id;
+          for (const s of sections) if (s.getBoundingClientRect().top < 120) cur = s.id;
+          navLinks.forEach((a) =>
+            a.classList.toggle("active", a.getAttribute("href") === "#" + cur),
+          );
+        },
+        { passive: true },
+      );
+
+      /* ================================================================ scopes */
+      const SCOPES = [
+        ["openid", "Use OpenID Connect: “tell me who this person is.”"],
+        ["email", "Include the user's email address."],
+        ["profile", "Include their name."],
+        [
+          "offline_access",
+          "Also issue a <b>refresh token</b>, so Console can keep working after the 1-hour access token expires (Chapter 8).",
+        ],
+        [
+          "project:member",
+          "Let the user <b>pick which projects</b> Console may manage, with member-level access, on the consent screen.",
+        ],
+      ];
+      $("#scopes").innerHTML = SCOPES.map(
+        ([s, d]) =>
+          `<div class="card" style="padding:14px"><code>${s}</code><p class="muted" style="font-size:.86rem;margin:6px 0 0">${d}</p></div>`,
+      ).join("");
+
+      /* ================================================================ files */
+      const FILES = [
+        { group: "Routes (URLs)" },
+        {
+          path: "routes/auth/login.ts",
+          tag: "new",
+          title: "GET /auth/login",
+          what: "The “Login with Railway” button links here. It does no rendering. It calls <code>startLogin()</code> and responds with a <b>302 redirect</b> to Railway's consent screen.",
+          why: "It has to be a server route because it sets cookies and needs secrets (client ID, redirect URI).",
+          code: `export const Route = createFileRoute("/auth/login")({
+  server: {
+    handlers: {
+      GET: () => new Response(null, { status: 302, headers: { location: startLogin() } }),
+    },
+  },
+});`,
+        },
+        {
+          path: "routes/auth/callback.ts",
+          tag: "new",
+          title: "GET /auth/callback",
+          what: "Railway sends the browser here after the user clicks Allow, with <code>?code=…&state=…</code> in the URL. It calls <code>finishLogin()</code> and either redirects home or shows a plain-text error.",
+          why: "This URL must be registered on the Railway OAuth app as the redirect URI. Railway won't redirect anywhere else.",
+          code: `GET: async ({ request }) => {
+  const result = await finishLogin(new URL(request.url).searchParams);
+  if (!result.ok) return new Response(result.message, { status: result.status });
+  return new Response(null, { status: 302, headers: { location: "/" } });
+},`,
+        },
+        {
+          path: "routes/auth/logout.ts",
+          tag: "new",
+          title: "POST /auth/logout",
+          what: "Clears the session cookie and answers <b>303 See Other</b> → <code>/</code>. A 303 tells the browser to follow up with a GET, so a refresh won't re-submit the form.",
+          why: "It's POST-only so that an <code>&lt;img src=\"/auth/logout\"&gt;</code> on some other site, or a prefetched link, can't sign you out.",
+          code: `POST: () => {
+  clearSession();
+  return new Response(null, { status: 303, headers: { location: "/" } });
+},`,
+        },
+        {
+          path: "routes/index.tsx",
+          tag: "mod",
+          title: "The home page",
+          what: "Was “Hello, world”. Now its <b>loader</b> calls the <code>getViewer</code> server function, which runs the <code>Viewer</code> query via <code>fetchViewer()</code> (now in <code>railway/viewer.ts</code>). Signed out (<code>null</code>) shows a Login button. Signed in shows your name, a Log out form, and a card per shared workspace (using <code>Card</code>, <code>Empty</code>, <code>Button</code> from <code>@repo/ui</code>).",
+          why: "The loader runs before render, so the page never flashes “signed out” and then re-renders.",
+          code: `const getViewer = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await getFreshSession();
+  if (!session) return null;
+
+  return fetchViewer(createRailwayClient(session.accessToken));
+});`,
+        },
+        { group: "Server modules (never shipped to the browser)" },
+        {
+          path: "railway/railway-oauth.ts",
+          tag: "new",
+          title: "The OAuth dance",
+          what: "Three functions: <code>startLogin()</code> (make state + PKCE verifier, set temp cookies, build the Railway URL), <code>finishLogin()</code> (verify state, swap code for tokens, save the session), and <code>getFreshSession()</code> (read the session, refresh if under a minute left).",
+          why: "Uses <b>arctic</b>'s generic <code>OAuth2Client</code>. arctic is a small library that handles the URL building and token requests, and sends the client secret as HTTP Basic auth.",
+          code: `const SCOPES = ["openid", "email", "profile", "offline_access", "project:member"];
+
+const railwayOAuth = () =>
+  new OAuth2Client(
+    env.RAILWAY_OAUTH_CLIENT_ID,
+    env.RAILWAY_OAUTH_CLIENT_SECRET,
+    new URL("/auth/callback", env.APP_URL).toString(),
+  );`,
+        },
+        {
+          path: "server/session.ts",
+          tag: "new",
+          title: "The encrypted cookie",
+          what: "Defines the <code>Session</code> shape (access token, refresh token, expiry), and <code>readSession</code> / <code>writeSession</code> / <code>clearSession</code> (plus <code>readSessionFromRequest</code>, added later for the live WebSocket). Encryption is done by <b>jose</b> as a JWE: “a JWT, but encrypted instead of just signed.”",
+          why: "No database needed. Validation with zod means a cookie from an older version of the code is treated as signed-out instead of crashing.",
+          code: `const Session = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string().nullable(),
+  accessTokenExpiresAt: z.number(),  // epoch ms; Railway access tokens last 1h
+});`,
+        },
+        {
+          path: "railway/railway-api.ts",
+          tag: "new",
+          title: "Typed GraphQL client",
+          what: "<code>createRailwayClient(accessToken)</code> returns a function that POSTs a gql.tada document to <code>backboard.railway.com/graphql/v2</code> with <code>Authorization: Bearer …</code>, and throws on HTTP or GraphQL errors.",
+          why: "GraphQL often returns HTTP 200 even when the query failed, with the problem in an <code>errors</code> array. The client checks that array explicitly.",
+          code: `headers: {
+  "content-type": "application/json",
+  authorization: \`Bearer \${accessToken}\`,
+},
+body: JSON.stringify({ query: print(document), variables }),`,
+        },
+        {
+          path: "server/env.ts",
+          tag: "",
+          title: "Environment variables (already committed)",
+          what: "Validates the server config with <b>@t3-oss/env-core</b> + zod as soon as the module loads: <code>RAILWAY_OAUTH_CLIENT_ID</code>, <code>RAILWAY_OAUTH_CLIENT_SECRET</code>, <code>SESSION_SECRET</code> (≥ 32 chars), <code>APP_URL</code>, <code>NODE_ENV</code> (plus the OpenRouter settings the chat added later).",
+          why: "A missing secret fails right away with a clear message, instead of showing up later as a confusing 502 halfway through a login.",
+          code: `SESSION_SECRET: z.string().min(32),
+/** Public origin of this app. Must match the redirect URI registered on the Railway OAuth app. */
+APP_URL: z.url().default("http://localhost:3000"),`,
+        },
+        { group: "Plumbing" },
+        {
+          path: "package.json",
+          full: "apps/console/package.json",
+          tag: "mod",
+          title: "New dependencies",
+          what: '<b>arctic</b> (OAuth client), <b>jose</b> (JWE encryption), <b>@t3-oss/env-core</b> (env validation), <b>@types/node</b> (for <code>process.env</code>, via the pnpm catalog). It also fixes the file: at HEAD it had duplicated <code>"typecheck"</code> and <code>"react-dom"</code> lines and wasn\'t valid JSON.',
+          why: "",
+          code: `"@t3-oss/env-core": "^0.13.11",
+"arctic": "^3.7.0",
+"jose": "^6.2.12",`,
+        },
+        {
+          path: "routeTree.gen.ts",
+          tag: "mod",
+          title: "Generated route tree",
+          what: "Regenerated by the TanStack Router plugin to include <code>/auth/login</code>, <code>/auth/callback</code>, <code>/auth/logout</code>. Don't edit it by hand.",
+          why: "",
+          code: "",
+        },
+        {
+          path: "pnpm-workspace.yaml · pnpm-lock.yaml",
+          full: "repo root",
+          tag: "mod",
+          title: "Workspace catalog + lockfile",
+          what: "Adds <code>@types/node: ^24.0.0</code> to the shared catalog; the lockfile follows the new deps.",
+          why: "",
+          code: "",
+        },
+      ];
+      let fileIdx = 1;
+      function renderFiles() {
+        $("#filelist").innerHTML = FILES.map((f, i) =>
+          f.group
+            ? `<div class="group">${f.group}</div>`
+            : `<button data-i="${i}" class="${i === fileIdx ? "on" : ""}"><span>${f.path}</span>${f.tag ? `<span class="tag ${f.tag}">${f.tag === "new" ? "new" : "modified"}</span>` : ""}</button>`,
+        ).join("");
+        const f = FILES[fileIdx];
+        $("#filedetail").innerHTML = `<div class="fade-in">
+    <div class="eyebrow">${f.full ?? "apps/console/src/" + f.path}</div>
+    <h3 style="margin:6px 0 8px;font-size:1.35rem">${f.title}</h3>
+    <p>${f.what}</p>${f.why ? `<p class="muted"><b>Why:</b> ${f.why}</p>` : ""}
+    ${f.code ? codeBlock(f.code) : ""}</div>`;
+        $$("#filelist button").forEach(
+          (b) =>
+            (b.onclick = () => {
+              fileIdx = +b.dataset.i;
+              renderFiles();
+            }),
+        );
+      }
+      renderFiles();
+
+      /* ================================================================ sequence player */
+      const LANE = { B: 120, S: 400, R: 680 };
+      const COLOR = { B: "var(--browser)", S: "var(--server)", R: "var(--railway)" };
+      const FLOWS = {
+        login: [
+          {
+            from: "B",
+            to: "S",
+            label: "GET /",
+            ch: "front",
+            title: "You open Console",
+            text: "There's no session cookie yet. The home route's loader runs <code>getViewer()</code> on the server.",
+            env: `<span class="h">GET / HTTP/1.1</span>\nHost: localhost:3000\nCookie: <span class="muted">(none)</span>`,
+          },
+          {
+            from: "S",
+            to: "B",
+            label: "200 · “Login with Railway”",
+            ch: "front",
+            title: "Signed-out page",
+            text: "<code>getFreshSession()</code> finds no cookie and returns <code>null</code>, so <code>getViewer()</code> returns <code>null</code> and <code>Home</code> renders the login link.",
+            code: `if (!viewer) {\n  return <a href="/auth/login" className={buttonVariants()}>Login with Railway</a>;\n}`,
+          },
+          {
+            from: "B",
+            to: "S",
+            label: "GET /auth/login",
+            ch: "front",
+            title: "Click “Login with Railway”",
+            text: "A plain link, so a full-page navigation (not a fetch). We're about to leave the site, and the browser needs to follow redirects.",
+          },
+          {
+            from: "S",
+            to: "S",
+            label: "make state + PKCE verifier",
+            ch: "local",
+            title: "Prepare the sign-in attempt",
+            text: "Two fresh random values (32 bytes each). <b>state</b> will prove the callback belongs to this attempt. The <b>verifier</b> will prove Console is the one redeeming the code. The URL gets only a <em>hash</em> of the verifier, the “challenge.”",
+            code: `const state = generateState();\nconst codeVerifier = generateCodeVerifier();\nconst url = railwayOAuth().createAuthorizationURLWithPKCE(\n  AUTHORIZATION_ENDPOINT, state, CodeChallengeMethod.S256, codeVerifier, SCOPES,\n);\nurl.searchParams.set("prompt", "consent");`,
+          },
+          {
+            from: "S",
+            to: "B",
+            label: "302 → Railway + temp cookies",
+            ch: "front",
+            title: "Redirect to Railway, remember the attempt",
+            text: "The response does two things: it sends the browser to Railway, and it stores <code>state</code> and <code>verifier</code> in short-lived (10 min) httpOnly cookies. Those cookies are how the server will remember this attempt when the browser comes back.",
+            env: `<span class="h">HTTP/1.1 302 Found</span>\nLocation: https://backboard.railway.com/oauth/auth?…\nSet-Cookie: railway_oauth_state=<span class="sec">Xq3…</span>; HttpOnly; SameSite=Lax; Max-Age=600\nSet-Cookie: railway_oauth_verifier=<span class="sec">dBj…</span>; HttpOnly; SameSite=Lax; Max-Age=600`,
+          },
+          {
+            from: "B",
+            to: "R",
+            label: "GET /oauth/auth?…&state&code_challenge",
+            ch: "front",
+            title: "Browser arrives at Railway",
+            text: "Everything in this URL is public: the client ID, which scopes, where to send the user back, the state, and the <em>challenge</em> (not the verifier).",
+            env: `<span class="h">GET /oauth/auth</span>\n  ?response_type=code\n  &client_id=<span class="h">…</span>\n  &redirect_uri=http://localhost:3000/auth/callback\n  &scope=openid email profile offline_access project:member\n  &state=Xq3…\n  &code_challenge=E9Mel…&code_challenge_method=S256\n  &prompt=consent`,
+          },
+          {
+            from: "R",
+            to: "R",
+            label: "sign in + pick projects",
+            ch: "local",
+            title: "The consent screen",
+            text: "This happens entirely on Railway's site. The user signs in to Railway (Console never sees the password), reviews the scopes, and ticks which projects to share. Railway remembers the challenge and the chosen projects alongside a one-time <b>authorization code</b>.",
+          },
+          {
+            from: "R",
+            to: "B",
+            label: "302 → /auth/callback?code&state",
+            ch: "front",
+            title: "Railway sends the user back",
+            text: "Railway redirects to the registered redirect URI with a short-lived <code>code</code> and the same <code>state</code> it was given. The code isn't a token yet. On its own it's useless (see PKCE).",
+            env: `<span class="h">HTTP/1.1 302 Found</span>\nLocation: http://localhost:3000/auth/callback\n  ?code=<span class="sec">SplxlOB…</span>\n  &state=Xq3…`,
+          },
+          {
+            from: "B",
+            to: "S",
+            label: "GET /auth/callback (+ cookies)",
+            ch: "front",
+            title: "Back at Console, cookies included",
+            text: "This is a top-level GET navigation coming from another site, and <code>SameSite=Lax</code> allows cookies on exactly that kind of request. So the browser attaches the state and verifier cookies from step ⑤.",
+            env: `<span class="h">GET /auth/callback?code=SplxlOB…&state=Xq3…</span>\nCookie: railway_oauth_state=Xq3…; railway_oauth_verifier=<span class="sec">dBj…</span>`,
+          },
+          {
+            from: "S",
+            to: "S",
+            label: "check state, drop temp cookies",
+            ch: "local",
+            title: "Is this the attempt we started?",
+            text: "Both temp cookies are deleted immediately (one use only). If Railway reported an error (e.g. the user clicked Deny), or the URL's <code>state</code> doesn't match the cookie, Console stops here with a 400.",
+            code: `if (!code || !state || !expectedState || !codeVerifier || state !== expectedState) {\n  return { ok: false, status: 400, message: "Invalid or expired sign-in attempt. Try again." };\n}`,
+          },
+          {
+            from: "S",
+            to: "R",
+            label: "POST /oauth/token (code+verifier)",
+            ch: "back",
+            title: "Swap the code for tokens (back channel)",
+            text: "Server-to-server request. The browser isn't involved and never sees it. Console proves who it is twice: the <b>client secret</b> (Basic auth) and the <b>PKCE verifier</b>, which Railway hashes and compares with the challenge from step ⑥.",
+            env: `<span class="h">POST /oauth/token</span>\nAuthorization: Basic <span class="sec">base64(client_id:client_secret)</span>\nContent-Type: application/x-www-form-urlencoded\n\ngrant_type=authorization_code\n&code=SplxlOB…\n&redirect_uri=http://localhost:3000/auth/callback\n&code_verifier=<span class="sec">dBj…</span>`,
+          },
+          {
+            from: "R",
+            to: "S",
+            label: "{ access_token, refresh_token }",
+            ch: "back",
+            title: "Railway hands over the keys",
+            text: "An <b>access token</b> (valid ~1 hour, used for API calls) and a <b>refresh token</b> (used to get new access tokens). The refresh token is only there because we asked for <code>offline_access</code> with <code>prompt=consent</code>.",
+            env: `{\n  "access_token": "<span class="sec">eyJ…</span>",\n  "refresh_token": "<span class="sec">8xLO…</span>",\n  "token_type": "Bearer",\n  "expires_in": 3600,\n  "id_token": "…"\n}`,
+          },
+          {
+            from: "S",
+            to: "B",
+            label: "302 → /  + railway_session cookie",
+            ch: "front",
+            title: "Lock the tokens in the cookie, go home",
+            text: "<code>writeSession()</code> encrypts <code>{ accessToken, refreshToken, accessTokenExpiresAt }</code> with <code>SESSION_SECRET</code> and sets it as a 30-day httpOnly cookie. The browser stores something it can't read.",
+            env: `<span class="h">HTTP/1.1 302 Found</span>\nLocation: /\nSet-Cookie: railway_session=eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..<span class="sec">(encrypted)</span>;\n  HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000\nSet-Cookie: railway_oauth_state=; Max-Age=0\nSet-Cookie: railway_oauth_verifier=; Max-Age=0`,
+          },
+          {
+            from: "B",
+            to: "S",
+            label: "GET /  (+ railway_session)",
+            ch: "front",
+            title: "Home again, this time with a session",
+            text: "From now on, the browser automatically sends <code>railway_session</code> with every request to Console.",
+            env: `<span class="h">GET / HTTP/1.1</span>\nCookie: railway_session=eyJhbGciOiJkaXIi…`,
+          },
+          {
+            from: "S",
+            to: "S",
+            label: "decrypt → still fresh",
+            ch: "local",
+            title: "Read the session",
+            text: "<code>getFreshSession()</code> decrypts the cookie and checks the expiry. More than a minute left, so no refresh is needed.",
+            code: `const session = await readSession();\nif (!session) return null;\nif (session.accessTokenExpiresAt - Date.now() > REFRESH_MARGIN_MS) return session;`,
+          },
+          {
+            from: "S",
+            to: "R",
+            label: "POST /graphql/v2 (Bearer token)",
+            ch: "back",
+            title: "Call Railway's API as the user",
+            text: "A typed GraphQL query: who am I, and what was shared with me? <code>externalWorkspaces</code> lists exactly the projects ticked on the consent screen.",
+            env: `<span class="h">POST https://backboard.railway.com/graphql/v2</span>\nAuthorization: Bearer <span class="sec">eyJ…</span>\n\nquery Viewer {\n  me { name email }\n  externalWorkspaces { id name projects { id name } }\n}`,
+          },
+          {
+            from: "R",
+            to: "S",
+            label: "{ me, externalWorkspaces }",
+            ch: "back",
+            title: "Railway answers",
+            text: "Only the projects the user shared. Railway enforces this on its side. Console couldn't see other projects even if it asked.",
+            env: `{ "data": {\n  "me": { "name": "Ada", "email": "ada@example.com" },\n  "externalWorkspaces": [\n    { "id": "w1", "name": "Personal",\n      "projects": [{ "id": "p1", "name": "container-thing" }] }\n] } }`,
+          },
+          {
+            from: "S",
+            to: "B",
+            label: "200 · “Signed in as Ada” + projects",
+            ch: "front",
+            title: "Done 🎉",
+            text: "The page renders with the user's name and project cards. The browser received names and IDs. It never received a token.",
+            env: `<span class="h">HTTP/1.1 200 OK</span>\nContent-Type: text/html\n\n&lt;p&gt;Signed in as Ada&lt;/p&gt; … &lt;li&gt;container-thing&lt;/li&gt;`,
+          },
+        ],
+        refresh: [
+          {
+            from: "B",
+            to: "S",
+            label: "GET / (+ 2h-old cookie)",
+            ch: "front",
+            title: "You come back after lunch",
+            text: "The cookie is still valid (30 days), but the access token inside it expired an hour ago.",
+            env: `<span class="h">GET /</span>\nCookie: railway_session=eyJhbGciOiJkaXIi…`,
+          },
+          {
+            from: "S",
+            to: "S",
+            label: "decrypt → token expired",
+            ch: "local",
+            title: "Notice the token is stale",
+            text: "Less than 60 s left (here: less than zero), so we need a new one. If there were no refresh token, we'd return <code>null</code> → signed out.",
+            code: `if (session.accessTokenExpiresAt - Date.now() > REFRESH_MARGIN_MS) return session;\nif (!session.refreshToken) return null;`,
+          },
+          {
+            from: "S",
+            to: "R",
+            label: "POST /oauth/token (refresh)",
+            ch: "back",
+            title: "Trade the refresh token for a new access token",
+            text: "Back channel again, with the client secret. The user doesn't see a thing.",
+            env: `<span class="h">POST /oauth/token</span>\nAuthorization: Basic <span class="sec">base64(client_id:client_secret)</span>\n\ngrant_type=refresh_token\n&refresh_token=<span class="sec">8xLO…</span>`,
+          },
+          {
+            from: "R",
+            to: "S",
+            label: "{ new access_token }",
+            ch: "back",
+            title: "Fresh token",
+            text: "Railway may or may not send a new refresh token. If it doesn't, <code>sessionFromTokens()</code> keeps the old one.",
+            code: `refreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : previousRefreshToken,`,
+          },
+          {
+            from: "S",
+            to: "S",
+            label: "re-encrypt session",
+            ch: "local",
+            title: "Save it",
+            text: "<code>writeSession(refreshed)</code> queues a new <code>Set-Cookie</code> on this response, with a new 30-day lifetime.",
+          },
+          {
+            from: "S",
+            to: "R",
+            label: "POST /graphql/v2 (new token)",
+            ch: "back",
+            title: "Carry on as normal",
+            text: "The rest of <code>getViewer()</code> doesn't know or care that a refresh just happened.",
+          },
+          {
+            from: "R",
+            to: "S",
+            label: "{ me, externalWorkspaces }",
+            ch: "back",
+            title: "Data",
+            text: "Same as before.",
+          },
+          {
+            from: "S",
+            to: "B",
+            label: "200 HTML + updated cookie",
+            ch: "front",
+            title: "Page + updated cookie",
+            text: "The browser swaps in the new cookie. The next hour of requests skip the refresh entirely.",
+            env: `<span class="h">HTTP/1.1 200 OK</span>\nSet-Cookie: railway_session=eyJhbGciOiJkaXIi…<span class="sec">(new)</span>; HttpOnly; Max-Age=2592000`,
+          },
+        ],
+        logout: [
+          {
+            from: "B",
+            to: "S",
+            label: "POST /auth/logout",
+            ch: "front",
+            title: "Click “Log out”",
+            text: "It's a real <code>&lt;form method=\"post\"&gt;</code>, so it works even before JavaScript loads. It's POST because GET requests happen by accident (prefetching, <code>&lt;img&gt;</code> tags, link previews).",
+            code: `<form method="post" action="/auth/logout">\n  <Button type="submit" variant="outline">Log out</Button>\n</form>`,
+          },
+          {
+            from: "S",
+            to: "B",
+            label: "303 → /  + delete cookie",
+            ch: "front",
+            title: "Forget the session",
+            text: "<code>clearSession()</code> tells the browser to delete the cookie. <b>303 See Other</b> means “now GET this other URL”, so a page refresh won't re-POST.",
+            env: `<span class="h">HTTP/1.1 303 See Other</span>\nLocation: /\nSet-Cookie: railway_session=; Max-Age=0; Path=/`,
+          },
+          {
+            from: "B",
+            to: "S",
+            label: "GET /  (no cookie)",
+            ch: "front",
+            title: "Back to square one",
+            text: "No cookie, so <code>getViewer()</code> returns <code>null</code>.",
+          },
+          {
+            from: "S",
+            to: "B",
+            label: "200 · “Login with Railway”",
+            ch: "front",
+            title: "Signed out",
+            text: "Note that Console never told Railway. The tokens weren't revoked, they're just gone from this browser. See Trade-offs.",
+          },
+        ],
+      };
+      let flow = "login",
+        step = 0,
+        playing = null;
+      const ROW = 52,
+        TOP = 34;
+      const circled = (n) => String.fromCodePoint(0x2460 + n); // ①②…
+
+      function drawSeq() {
+        const steps = FLOWS[flow];
+        const svg = $("#seq");
+        const H = TOP + steps.length * ROW + 30;
+        svg.setAttribute("viewBox", `0 0 800 ${H}`);
+        let s = "";
+        for (const [k, x] of Object.entries(LANE)) {
+          s += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="${COLOR[k]}" stroke-opacity=".28" stroke-width="2" stroke-dasharray="2 6"/>`;
+        }
+        steps.forEach((st, i) => {
+          const y = TOP + i * ROW + 14;
+          const x1 = LANE[st.from],
+            x2 = LANE[st.to];
+          const stroke = st.ch === "back" ? "var(--secret)" : COLOR[st.from];
+          const dash = st.ch === "back" ? "7 5" : st.ch === "local" ? "2 4" : "";
+          const cls = i < step ? "past" : i === step ? "current" : "future";
+          let path,
+            len,
+            lx,
+            anchor = "middle";
+          if (st.from === st.to) {
+            path = `M ${x1} ${y - 8} h 46 v 18 h -46`;
+            len = 110;
+            lx = x1 + 56;
+            anchor = "start";
+            if (x1 === LANE.R) {
+              path = `M ${x1} ${y - 8} h -46 v 18 h 46`;
+              lx = x1 - 56;
+              anchor = "end";
+            }
+          } else {
+            path = `M ${x1} ${y} L ${x2} ${y}`;
+            len = Math.abs(x2 - x1);
+            lx = (x1 + x2) / 2;
+          }
+          const dir = Math.sign(x2 - x1);
+          const ah =
+            st.from !== st.to
+              ? `${x2},${y} ${x2 - 9 * dir},${y - 5} ${x2 - 9 * dir},${y + 5}`
+              : x1 === LANE.R
+                ? `${x1},${y + 10} ${x1 - 9},${y + 5} ${x1 - 9},${y + 15}`
+                : `${x1},${y + 10} ${x1 + 9},${y + 5} ${x1 + 9},${y + 15}`;
+          s += `<g class="msg ${cls}" data-i="${i}" style="--len:${len}">
+      <rect x="0" y="${y - 22}" width="800" height="${ROW}" fill="transparent"/>
+      <path class="${dash ? "" : "draw"}" d="${path}" fill="none" stroke="${stroke}" stroke-width="2" ${dash ? `stroke-dasharray="${dash}"` : ""}/>
+      <polygon points="${ah}" fill="${stroke}"/>
+      <text x="${lx}" y="${st.from === st.to ? y + 5 : y - 7}" text-anchor="${anchor}">${esc(st.label)}</text>
+      <circle cx="${x1}" cy="${st.from === st.to ? y - 8 : y}" r="10" fill="${stroke}"/>
+      <text class="num" x="${x1}" y="${(st.from === st.to ? y - 8 : y) + 3.5}" text-anchor="middle">${i + 1}</text>
+    </g>`;
+        });
+        // travelling packet
+        const cur = steps[step];
+        if (cur && cur.from !== cur.to) {
+          const y = TOP + step * ROW + 14;
+          const c = cur.ch === "back" ? "var(--secret)" : COLOR[cur.from];
+          s += `<circle class="packet" r="5" cx="${LANE[cur.from]}" cy="${y}" fill="${c}" style="color:${c}">
+      <animate attributeName="cx" from="${LANE[cur.from]}" to="${LANE[cur.to]}" dur="0.7s" begin="indefinite" fill="freeze"/>
+      <animate attributeName="opacity" values="1;1;0" keyTimes="0;.85;1" dur="0.9s" begin="indefinite" fill="freeze"/></circle>`;
+        }
+        svg.innerHTML = s;
+        $$("#seq animate").forEach((a) => a.beginElement());
+        $$("#seq .msg").forEach((g) => (g.onclick = () => go(+g.dataset.i)));
+        // keep the current arrow in view inside the scroll box
+        const box = $("#stageScroll");
+        const svgScale = svg.getBoundingClientRect().width / 800;
+        const yPx = (TOP + step * ROW) * svgScale + 60;
+        if (yPx < box.scrollTop + 60 || yPx > box.scrollTop + box.clientHeight - 60)
+          box.scrollTop = yPx - box.clientHeight / 2;
+
+        const chName = {
+          front: "front channel · through the browser",
+          back: "back channel · server ↔ server",
+          local: "internal step",
+        };
+        $("#stepdetail").innerHTML = `<div class="fade-in">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="pill">Step ${circled(step)}</span><span class="channel ${cur.ch}">${chName[cur.ch]}</span></div>
+    <div class="step-title">${cur.title}</div>
+    <p>${cur.text}</p>
+    ${cur.code ? codeBlock(cur.code) : ""}
+    ${cur.env ? `<div class="eyebrow" style="margin-top:12px">On the wire</div><div class="envelope">${cur.env}</div>` : ""}
+  </div>`;
+        $("#count").textContent = `${step + 1} / ${steps.length}`;
+        $("#prev").disabled = step === 0;
+        $("#next").disabled = step === steps.length - 1;
+      }
+      function go(i) {
+        step = Math.max(0, Math.min(FLOWS[flow].length - 1, i));
+        drawSeq();
+      }
+      function stopPlay() {
+        clearInterval(playing);
+        playing = null;
+        $("#play").textContent = "▶ Play";
+      }
+      $("#next").onclick = () => {
+        stopPlay();
+        go(step + 1);
+      };
+      $("#prev").onclick = () => {
+        stopPlay();
+        go(step - 1);
+      };
+      $("#reset").onclick = () => {
+        stopPlay();
+        go(0);
+      };
+      $("#play").onclick = () => {
+        if (playing) return stopPlay();
+        if (step === FLOWS[flow].length - 1) go(0);
+        $("#play").textContent = "⏸ Pause";
+        playing = setInterval(() => {
+          if (step >= FLOWS[flow].length - 1) return stopPlay();
+          go(step + 1);
+        }, 3200);
+      };
+      $$("#flowtabs button").forEach(
+        (b) =>
+          (b.onclick = () => {
+            stopPlay();
+            $$("#flowtabs button").forEach((x) => x.classList.toggle("on", x === b));
+            flow = b.dataset.flow;
+            step = 0;
+            drawSeq();
+          }),
+      );
+      addEventListener("keydown", (e) => {
+        if (e.target.matches("input, textarea")) return;
+        const r = $("#flow").getBoundingClientRect();
+        if (r.top > innerHeight * 0.6 || r.bottom < innerHeight * 0.3) return;
+        if (e.key === "ArrowRight") {
+          stopPlay();
+          go(step + 1);
+          e.preventDefault();
+        }
+        if (e.key === "ArrowLeft") {
+          stopPlay();
+          go(step - 1);
+          e.preventDefault();
+        }
+      });
+      drawSeq();
+      addEventListener("resize", drawSeq);
+
+      /* ================================================================ crypto helpers */
+      const b64u = (bytes) =>
+        btoa(String.fromCharCode(...bytes))
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+      const unb64u = (s) => {
+        s = s.replace(/-/g, "+").replace(/_/g, "/");
+        while (s.length % 4) s += "=";
+        return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+      };
+      const rand = (n) => crypto.getRandomValues(new Uint8Array(n));
+      const sha256 = async (str) =>
+        new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)));
+
+      /* ================================================================ state lab */
+      const ST = {
+        normal: {
+          story:
+            "You clicked “Login with Railway” yourself. Console set a state cookie, Railway echoed the same state back.",
+          cookie: "Xq3vF9…kP2",
+          url: "Xq3vF9…kP2",
+          verdict: [
+            "ok",
+            "✅ <b>Match.</b> The callback belongs to a login this browser started. Console continues to the token exchange.",
+          ],
+        },
+        attack: {
+          story:
+            "An attacker started a login in <em>their</em> browser, stopped right before the callback, and sent you the link: <code>…/auth/callback?code=ATTACKER_CODE&state=Zz9…</code>. You never clicked Login.",
+          cookie: "(no cookie, you never started a login)",
+          url: "Zz9mQ1…aT7",
+          verdict: [
+            "no",
+            "🛑 <b>Rejected (400).</b> No state cookie, so <code>expectedState</code> is undefined. Even if you <em>had</em> a login in progress, its state would be different. (The PKCE verifier wouldn't match either: the attacker's code is tied to the attacker's verifier.)",
+          ],
+        },
+        stale: {
+          story:
+            "You logged in successfully, then pressed Back until you reached the old callback URL and it loaded again.",
+          cookie: "(deleted after first use)",
+          url: "Xq3vF9…kP2",
+          verdict: [
+            "no",
+            "🛑 <b>Rejected (400).</b> <code>finishLogin()</code> deletes both temp cookies before checking anything, so a callback can only be used once. (Railway would also refuse to redeem the same code twice.) Your existing session cookie isn't affected.",
+          ],
+        },
+      };
+      function setST(k) {
+        $$("#st-normal,#st-attack,#st-stale").forEach((b) =>
+          b.classList.toggle("on", b.id === "st-" + k),
+        );
+        const s = ST[k];
+        $("#st-story").innerHTML = s.story;
+        $("#st-cookie").textContent = s.cookie;
+        $("#st-url").textContent = s.url;
+        const v = $("#st-verdict");
+        v.className = "verdict " + s.verdict[0] + " fade-in";
+        v.innerHTML = s.verdict[1];
+      }
+      $("#st-normal").onclick = () => setST("normal");
+      $("#st-attack").onclick = () => setST("attack");
+      $("#st-stale").onclick = () => setST("stale");
+      setST("normal");
+
+      /* ================================================================ PKCE lab */
+      let pkVer = "",
+        pkChal = "";
+      async function pkGen() {
+        pkVer = b64u(rand(32));
+        pkChal = b64u(await sha256(pkVer));
+        $("#pk-ver").textContent = pkVer;
+        $("#pk-chal").textContent = pkChal;
+        $("#pk-guess").value = "";
+        const v = $("#pk-verdict");
+        v.className = "verdict";
+        v.textContent = "Railway's token endpoint is waiting…";
+      }
+      $("#pk-gen").onclick = pkGen;
+      $("#pk-try").onclick = async () => {
+        const g = $("#pk-guess").value;
+        const h = b64u(await sha256(g));
+        const v = $("#pk-verdict");
+        if (h === pkChal) {
+          v.className = "verdict ok fade-in";
+          v.innerHTML = `✅ SHA-256 matches the challenge. Tokens issued. (Only possible because you copied the verifier, which in real life never leaves Console's server.)`;
+        } else {
+          v.className = "verdict no fade-in";
+          v.innerHTML =
+            `🛑 <b>invalid_grant</b>. SHA-256(your guess) = <span class="mono">${h.slice(0, 22)}…</span> ≠ challenge <span class="mono">${pkChal.slice(0, 22)}…</span>` +
+            (g === pkChal
+              ? `<br><span class="muted">Pasting the challenge doesn't work: Railway hashes what you send, so you'd need the input that <em>produces</em> it.</span>`
+              : "");
+        }
+      };
+      pkGen();
+
+      /* ================================================================ JWE lab (alg=dir, enc=A256GCM, same as jose EncryptJWT) */
+      const now = Math.floor(Date.now() / 1000);
+      $("#jw-payload").value = JSON.stringify(
+        {
+          session: {
+            accessToken: "<access token from Railway>",
+            refreshToken: "<refresh token from Railway>",
+            accessTokenExpiresAt: (now + 3600) * 1000,
+          },
+          iat: now,
+          exp: now + 2592000,
+        },
+        null,
+        2,
+      );
+      let jwToken = "",
+        jwFlipIdx = -1;
+      async function jwKey() {
+        return crypto.subtle.importKey(
+          "raw",
+          await sha256($("#jw-secret").value),
+          "AES-GCM",
+          false,
+          ["encrypt", "decrypt"],
+        );
+      }
+      function jwSecretCheck() {
+        const n = $("#jw-secret").value.length;
+        $("#jw-secretmsg").innerHTML =
+          n >= 32
+            ? `<span class="good">✓ ${n} chars. env.ts accepts it.</span>`
+            : `<span class="bad">✗ ${n} chars. env.ts would refuse to start (min 32).</span>`;
+      }
+      $("#jw-secret").oninput = jwSecretCheck;
+      jwSecretCheck();
+      function jwRender() {
+        const parts = jwToken.split(".");
+        let html = "",
+          pos = 0;
+        parts.forEach((p, i) => {
+          let seg = "";
+          for (const ch of p) {
+            seg += pos === jwFlipIdx ? `<span class="flip">${esc(ch)}</span>` : esc(ch);
+            pos++;
+          }
+          html +=
+            `<span class="p${i}">${seg}</span>` +
+            (i < parts.length - 1 ? `<span style="color:var(--text)">.</span>` : "");
+          pos++;
+        });
+        $("#jw-out").innerHTML = html;
+      }
+      $("#jw-enc").onclick = async () => {
+        let payload;
+        try {
+          payload = JSON.parse($("#jw-payload").value);
+        } catch {
+          $("#jw-verdict").className = "verdict no";
+          $("#jw-verdict").textContent = "That payload isn't valid JSON.";
+          return;
+        }
+        const header = b64u(
+          new TextEncoder().encode(JSON.stringify({ alg: "dir", enc: "A256GCM" })),
+        );
+        const iv = rand(12);
+        const ct = new Uint8Array(
+          await crypto.subtle.encrypt(
+            {
+              name: "AES-GCM",
+              iv,
+              additionalData: new TextEncoder().encode(header),
+              tagLength: 128,
+            },
+            await jwKey(),
+            new TextEncoder().encode(JSON.stringify(payload)),
+          ),
+        );
+        jwToken = [header, "", b64u(iv), b64u(ct.slice(0, -16)), b64u(ct.slice(-16))].join(".");
+        jwFlipIdx = -1;
+        jwRender();
+        const v = $("#jw-verdict");
+        v.className = "verdict fade-in";
+        v.innerHTML = `Cookie set: <b>${jwToken.length}</b> bytes. Now press “Next request” to read it back.`;
+      };
+      $("#jw-dec").onclick = async () => {
+        const v = $("#jw-verdict");
+        if (!jwToken) {
+          v.className = "verdict warn";
+          v.textContent = "No cookie yet. Encrypt first.";
+          return;
+        }
+        try {
+          const [h, , iv, ct, tag] = jwToken.split(".");
+          const buf = new Uint8Array([...unb64u(ct), ...unb64u(tag)]);
+          const pt = await crypto.subtle.decrypt(
+            {
+              name: "AES-GCM",
+              iv: unb64u(iv),
+              additionalData: new TextEncoder().encode(h),
+              tagLength: 128,
+            },
+            await jwKey(),
+            buf,
+          );
+          const obj = JSON.parse(new TextDecoder().decode(pt));
+          const s = obj.session ?? {};
+          const shapeOk =
+            typeof s.accessToken === "string" &&
+            (s.refreshToken === null || typeof s.refreshToken === "string") &&
+            typeof s.accessTokenExpiresAt === "number";
+          const expired = typeof obj.exp === "number" && obj.exp < Date.now() / 1000;
+          if (expired) {
+            v.className = "verdict no fade-in";
+            v.innerHTML = `🛑 Decrypted, but <code>exp</code> is in the past. jose rejects it, so <code>readSession()</code> → <b>null</b> → signed out.`;
+            return;
+          }
+          if (!shapeOk) {
+            v.className = "verdict warn fade-in";
+            v.innerHTML = `⚠️ Decrypted fine, but the zod <code>Session.parse</code> failed (wrong shape). → <b>null</b> → signed out.<br><span class="mono" style="font-size:.75rem">${esc(JSON.stringify(obj))}</span>`;
+            return;
+          }
+          v.className = "verdict ok fade-in";
+          v.innerHTML = `✅ <b>Decrypted and validated.</b> The server now has:<br><span class="mono" style="font-size:.78rem">${esc(JSON.stringify(s))}</span>`;
+        } catch {
+          v.className = "verdict no fade-in";
+          v.innerHTML = `🛑 <b>Decryption failed</b> (auth tag mismatch). <code>readSession()</code> swallows the error and returns <b>null</b>, so the user simply looks signed out. There's no crash and no partial data.`;
+        }
+      };
+      $("#jw-tamper").onclick = () => {
+        const v = $("#jw-verdict");
+        if (!jwToken) {
+          v.className = "verdict warn";
+          v.textContent = "Encrypt something first.";
+          return;
+        }
+        const parts = jwToken.split(".");
+        const ctStart = parts[0].length + 1 + parts[1].length + 1 + parts[2].length + 1;
+        const i = ctStart + Math.floor(Math.random() * parts[3].length);
+        const c = jwToken[i];
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        const nc = alphabet[(alphabet.indexOf(c) + 1 + Math.floor(Math.random() * 60)) % 64];
+        jwToken = jwToken.slice(0, i) + nc + jwToken.slice(i + 1);
+        jwFlipIdx = i;
+        jwRender();
+        v.className = "verdict warn fade-in";
+        v.innerHTML = `Changed <code>${esc(c)}</code> → <code>${esc(nc)}</code> in the ciphertext (highlighted). Now press <b>Next request</b>. Also try changing the secret and decrypting.`;
+      };
+      $("#jw-peek").onclick = () => {
+        const v = $("#jw-verdict");
+        if (!jwToken) {
+          v.className = "verdict warn";
+          v.textContent = "Encrypt something first.";
+          return;
+        }
+        const [h, , , ct] = jwToken.split(".");
+        const hdr = new TextDecoder().decode(unb64u(h));
+        const junk = [...unb64u(ct).slice(0, 24)]
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join(" ");
+        v.className = "verdict fade-in";
+        v.innerHTML = `Header decodes fine: <span class="mono">${esc(hdr)}</span><br>Ciphertext is just noise: <span class="mono" style="font-size:.75rem">${junk} …</span><br><span class="muted">Compare with a normal <em>signed</em> JWT, where anyone can base64-decode the payload and read the tokens.</span>`;
+      };
+
+      /* ================================================================ flags */
+      const FLAGS = [
+        [
+          "httpOnly: true",
+          "JavaScript on the page can't read the cookie. <code>document.cookie</code> won't show it.",
+          "Any XSS bug, or a compromised npm package running in the browser, could read <code>document.cookie</code> and send the encrypted session to an attacker, who could then replay it against Console.",
+        ],
+        [
+          "secure: prod only",
+          "In production the cookie is only sent over HTTPS. It's turned off in development so <code>http://localhost:3000</code> works.",
+          "In production, any plain-HTTP request (coffee-shop Wi-Fi, a mistyped <code>http://</code> link) would carry the session cookie in the clear.",
+        ],
+        [
+          'sameSite: "lax"',
+          "Sent on same-site requests and on <b>top-level GET navigations</b> from other sites, but not on cross-site POSTs, iframes, or fetches.",
+          'With <code>"strict"</code>, the redirect back from railway.com is cross-site, so the browser would <em>withhold</em> the state and verifier cookies and every login would fail. With <code>"none"</code>, other sites could make authenticated requests to Console.',
+        ],
+        [
+          'path: "/"',
+          "The cookie is sent for every URL on the site.",
+          "If it were scoped to, say, <code>/auth</code>, the home page loader would never see the session. And <code>deleteCookie</code> must use the same path as <code>setCookie</code>, which is why both reuse <code>cookieDefaults()</code>.",
+        ],
+      ];
+      $("#flagcards").innerHTML = FLAGS.map(
+        ([t, a, b]) => `<div class="flipcard"><div class="inner">
+  <div class="face"><h4 class="s">${t}</h4><p>${a}</p><span class="hint">click → without it</span></div>
+  <div class="face back"><h4 class="bad">without it…</h4><p>${b}</p><span class="hint">click to flip back</span></div>
+</div></div>`,
+      ).join("");
+      $$(".flipcard").forEach((c) => (c.onclick = () => c.classList.toggle("flipped")));
+
+      /* ================================================================ token clock */
+      function clock() {
+        const t = +$("#ck-slider").value; // minutes since token issued
+        const left = 60 - t;
+        const hasRT = $("#ck-hasrt").checked,
+          rtOk = $("#ck-rtok").checked;
+        $("#ck-rtok").disabled = !hasRT;
+        $("#ck-time").textContent = `${t} min after the access token was issued`;
+        const pct = Math.max(0, Math.min(100, (left / 60) * 100));
+        $("#ck-fill").style.width = pct + "%";
+        $("#ck-fill").style.background =
+          left > 1
+            ? "linear-gradient(90deg,var(--server),#2bb57b)"
+            : "linear-gradient(90deg,var(--danger),#b91c1c)";
+        $("#ck-label").textContent =
+          left > 0 ? `${left.toFixed(1)} min left` : `expired ${(-left).toFixed(1)} min ago`;
+        const v = $("#ck-verdict");
+        let hi;
+        if (left > 1) {
+          v.className = "verdict ok";
+          v.innerHTML =
+            "✅ More than 60 s left. Use the session as-is. No network call to the token endpoint.";
+          hi = 2;
+        } else if (!hasRT) {
+          v.className = "verdict no";
+          v.innerHTML =
+            "🛑 Token is (nearly) expired and there's no refresh token. <code>getFreshSession()</code> → <b>null</b>. The user sees “Login with Railway”.";
+          hi = 3;
+        } else if (!rtOk) {
+          v.className = "verdict no";
+          v.innerHTML =
+            "🛑 Refresh attempted, Railway said no (revoked access, expired refresh token, or an outage). Error logged, → <b>null</b> → signed out.";
+          hi = 5;
+        } else {
+          v.className = "verdict warn";
+          v.innerHTML = `🔄 ${left > 0 ? "Less than a minute left" : "Expired"}, so refresh <em>first</em>, then continue. The margin exists so a token doesn't expire <em>while</em> a GraphQL request is in flight. A new cookie is written and the clock restarts at 0.`;
+          hi = 4;
+        }
+        const lines = [
+          "const session = await readSession();",
+          "if (!session) return null;",
+          "if (session.accessTokenExpiresAt - Date.now() > REFRESH_MARGIN_MS) return session;",
+          "if (!session.refreshToken) return null;",
+          "try {\n  const tokens = await railwayOAuth().refreshAccessToken(TOKEN_ENDPOINT, session.refreshToken, []);\n  const refreshed = sessionFromTokens(tokens, session.refreshToken);\n  await writeSession(refreshed);\n  return refreshed;",
+          '} catch (cause) {\n  console.error("Railway token refresh failed", cause);\n  return null;\n}',
+        ];
+        const el = $("#ck-code");
+        el.dataset.raw = lines.map((l, i) => (i === hi ? `<mark>${l}</mark>` : l)).join("\n");
+        renderCode(el);
+      }
+      ["#ck-slider", "#ck-hasrt", "#ck-rtok"].forEach((s) => $(s).addEventListener("input", clock));
+      clock();
+
+      /* ================================================================ devtools sim */
+      const DT = {
+        cookie: `<span class="prompt">&gt;</span> document.cookie\n<span class="good">''</span>\n<span class="muted">// Empty string. railway_session is httpOnly, so page JavaScript can't see it at all.\n// (You can see it in the Application → Cookies panel, as an encrypted blob.)</span>`,
+        data: `<span class="prompt">&gt;</span> // what TanStack serialised into the page for hydration\n{\n  user: { name: <span class="good">"Ada"</span>, email: <span class="good">"ada@example.com"</span> },\n  workspaces: [{ id: <span class="good">"w1"</span>, name: <span class="good">"Personal"</span>, projects: [ … ] }]\n}\n<span class="muted">// No accessToken anywhere. It never left the server.</span>`,
+        fetch: `<span class="prompt">&gt;</span> await fetch("https://backboard.railway.com/graphql/v2", { method: "POST", … })\n<span class="bad">✗ You'd need an "Authorization: Bearer …" header, and the browser has no token to put in it.</span>\n<span class="muted">// Every Railway call has to go through Console's server.</span>`,
+      };
+      $$("[data-dt]").forEach(
+        (b) =>
+          (b.onclick = () => {
+            const d = $("#devtools");
+            d.innerHTML = DT[b.dataset.dt];
+            d.classList.remove("fade-in");
+            void d.offsetWidth;
+            d.classList.add("fade-in");
+          }),
+      );
+
+      /* ================================================================ failures */
+      const FAILS = [
+        [
+          "User clicks “Deny” on Railway's consent screen",
+          "400 text",
+          "Railway redirects to <code>/auth/callback?error=access_denied</code>. <code>finishLogin()</code> sees <code>error</code> and returns <i>“Railway sign-in failed: …”</i> with Railway's <code>error_description</code>.",
+        ],
+        [
+          "User spends more than 10 minutes on the consent screen",
+          "400 text",
+          "The temp cookies had <code>maxAge: 600</code>, so they're gone when the browser comes back. <code>expectedState</code> is undefined → <i>“Invalid or expired sign-in attempt. Try again.”</i>",
+        ],
+        [
+          "Login started in one browser, finished in another",
+          "400 text",
+          "The second browser doesn't have the temp cookies. Same message as above. That's intentional, it's exactly the attack <code>state</code> prevents.",
+        ],
+        [
+          "Wrong client secret, or Railway is down during the exchange",
+          "502 text",
+          "<code>validateAuthorizationCode()</code> throws; the error is logged server-side and the user sees <i>“Could not complete Railway sign-in.”</i>",
+        ],
+        [
+          "APP_URL doesn't match the registered redirect URI",
+          "Railway error page",
+          "Railway refuses at step ⑥, before the user even reaches consent, because the <code>redirect_uri</code> isn't on the allow-list. Console code never runs.",
+        ],
+        [
+          "A required env var is missing or SESSION_SECRET is too short",
+          "server won't start",
+          "<code>createEnv</code> throws a validation error when <code>env.ts</code> is first imported. The message names the bad variable.",
+        ],
+        [
+          "SESSION_SECRET is changed (rotated)",
+          "everyone signed out",
+          "Every existing cookie fails to decrypt → <code>readSession()</code> returns <code>null</code>. Users just see the login button. It's the reset-everything switch.",
+        ],
+        [
+          "Cookie edited, truncated, or from an older Session shape",
+          "signed out",
+          "Decryption or <code>Session.parse</code> fails inside the <code>try</code> → <code>null</code>.",
+        ],
+        [
+          "Access token expired and refresh fails",
+          "signed out",
+          "Logged as <i>“Railway token refresh failed”</i>, then <code>null</code>. The stale cookie stays until the next login overwrites it.",
+        ],
+        [
+          "Railway's GraphQL API returns an error",
+          "error page",
+          "<code>createRailwayClient</code> throws (<i>“Railway API: …”</i>). The loader rejects and TanStack Router shows its default error UI. The route doesn't define a custom <code>errorComponent</code> yet.",
+        ],
+      ];
+      $("#faillist").innerHTML = FAILS.map(
+        ([t, r, b]) =>
+          `<details class="fail"><summary><span>${t}</span><span class="result">${r}</span></summary><div class="body">${b}</div></details>`,
+      ).join("");
+
+      /* ================================================================ quiz */
+      const QUIZ = [
+        [
+          "Why doesn't the browser ever see the Railway access token?",
+          [
+            "Because it's sent in a URL fragment",
+            "Because the token exchange is a server-to-server request, and the token is stored encrypted in an httpOnly cookie",
+            "Because Railway encrypts it before sending",
+            "It does see it, briefly, in the callback URL",
+          ],
+          1,
+          "The callback URL carries only the one-time <code>code</code>. The code→token swap is a back-channel request (step ⑪), and the token is then sealed with <code>SESSION_SECRET</code>.",
+        ],
+        [
+          'What would break if the cookies used <code>sameSite: "strict"</code>?',
+          [
+            "Nothing",
+            "Logout",
+            "The callback: the browser wouldn't send the state/verifier cookies on the redirect from railway.com",
+            "GraphQL calls",
+          ],
+          2,
+          "Railway's redirect back is a cross-site navigation. <code>Lax</code> allows cookies on top-level GETs like that one; <code>Strict</code> doesn't, so <code>expectedState</code> would always be missing.",
+        ],
+        [
+          "An attacker steals the <code>code</code> from your browser history. What stops them?",
+          [
+            "Nothing, codes are like passwords",
+            "They don't have the PKCE verifier or the client secret, both needed to redeem it",
+            "The code is encrypted",
+            "httpOnly",
+          ],
+          1,
+          "Railway checks <code>SHA-256(code_verifier) === code_challenge</code> and authenticates the client. The code is also single-use and short-lived.",
+        ],
+        [
+          "You rotate <code>SESSION_SECRET</code> in production. What happens?",
+          [
+            "The server crashes",
+            "Every user is signed out, gracefully",
+            "Old sessions keep working",
+            "Railway revokes all tokens",
+          ],
+          1,
+          "Old cookies fail to decrypt, <code>readSession()</code> returns <code>null</code>, and users see the login button. Railway knows nothing about it.",
+        ],
+        [
+          "Why is logout a POST form and not a link?",
+          [
+            "POST is faster",
+            "So that stray GETs (image tags, link prefetching) can't sign the user out",
+            "Cookies can only be deleted on POST",
+            "TanStack requires it",
+          ],
+          1,
+          "GET requests are supposed to be safe to fire at any time. A logout that changes state shouldn't be triggered by one.",
+        ],
+      ];
+      let score = 0,
+        answered = 0;
+      $("#quizbox").innerHTML = QUIZ.map(
+        ([q, opts, , why], i) => `<div class="q card" data-q="${i}"><div><b>${i + 1}.</b> ${q}</div>
+  <div class="opts">${opts.map((o, j) => `<button data-j="${j}">${o}</button>`).join("")}</div><div class="why">${why}</div></div>`,
+      ).join("");
+      $$(".q").forEach((qel) => {
+        const i = +qel.dataset.q;
+        $$("button", qel).forEach(
+          (b) =>
+            (b.onclick = () => {
+              if (qel.classList.contains("answered")) return;
+              qel.classList.add("answered");
+              const j = +b.dataset.j,
+                right = QUIZ[i][2];
+              $$("button", qel)[right].classList.add("right");
+              if (j !== right) b.classList.add("wrong");
+              else score++;
+              answered++;
+              $("#quizscore").textContent =
+                answered === QUIZ.length
+                  ? `Score: ${score} / ${QUIZ.length}${score === QUIZ.length ? ". You could explain this to someone else now." : ""}`
+                  : "";
+            }),
+        );
+      });
+    </script>
+  </body>
+</html>
