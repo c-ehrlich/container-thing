@@ -2,10 +2,10 @@ import { cn } from "@repo/ui/lib/utils";
 import { HistoryIcon } from "lucide-react";
 
 import { timeAgo } from "../overview/health";
-import { rollbackDeploymentFn } from "../railway/project";
+import { ActionButton } from "../railway/action-button";
+import { deploymentActionFn } from "../railway/project";
 import type { ServiceDeployment } from "../railway/service";
 import { ServiceStatusBadge } from "../railway/service-status-badge";
-import { ActionButton } from "./service-actions";
 
 /**
  * The service's deploys, newest first. Clicking one shows its logs; older ones Railway can still
@@ -69,7 +69,11 @@ export function DeploymentList(props: {
                   variant="ghost"
                   icon={<HistoryIcon data-icon="inline-start" />}
                   title="Deploys this version again, replacing what's running"
-                  run={() => rollbackDeploymentFn({ data: { deploymentId: deployment.id } })}
+                  run={() =>
+                    deploymentActionFn({
+                      data: { deploymentId: deployment.id, action: "rollback" },
+                    })
+                  }
                 />
               )}
             </div>
