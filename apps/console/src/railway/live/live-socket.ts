@@ -65,9 +65,7 @@ function endpointFor(query: string): { endpoint: string } | { error: string } {
   } catch {
     return { error: "Invalid GraphQL document" };
   }
-  const operations = document.definitions.filter(
-    (d) => d.kind === Kind.OPERATION_DEFINITION,
-  );
+  const operations = document.definitions.filter((d) => d.kind === Kind.OPERATION_DEFINITION);
   const operation = operations[0];
   if (operations.length !== 1 || operation?.operation !== "subscription") {
     return { error: "Only single subscription operations are allowed" };
@@ -89,10 +87,7 @@ function endpointFor(query: string): { endpoint: string } | { error: string } {
 export default defineWebSocketHandler({
   async upgrade(request) {
     const session = await readSessionFromRequest(request);
-    if (
-      !session ||
-      session.accessTokenExpiresAt - Date.now() < TOKEN_EXPIRY_MARGIN_MS
-    ) {
+    if (!session || session.accessTokenExpiresAt - Date.now() < TOKEN_EXPIRY_MARGIN_MS) {
       // The client refreshes the session (ensureLiveSession) before connecting, so this means
       // signed out. The client notices that in ensureLiveSession and stops retrying.
       throw new Response("Unauthorized", { status: 401 });
@@ -110,16 +105,12 @@ export default defineWebSocketHandler({
     const { accessToken, accessTokenExpiresAt } = z
       .object({ accessToken: z.string(), accessTokenExpiresAt: z.number() })
       .parse(peer.context);
-    const expiresInMs =
-      accessTokenExpiresAt - Date.now() - TOKEN_EXPIRY_MARGIN_MS;
+    const expiresInMs = accessTokenExpiresAt - Date.now() - TOKEN_EXPIRY_MARGIN_MS;
     connections.set(peer.id, {
       accessToken,
       upstreams: new Map(),
       subscriptions: new Map(),
-      expiryTimer: setTimeout(
-        () => peer.close(CLOSE_RECONNECT, "Session expiring"),
-        expiresInMs,
-      ),
+      expiryTimer: setTimeout(() => peer.close(CLOSE_RECONNECT, "Session expiring"), expiresInMs),
       closing: false,
     });
   },
@@ -159,11 +150,7 @@ export default defineWebSocketHandler({
           send({ type: "error", id, payload: [{ message: target.error }] });
           return;
         }
-        const unsubscribe = upstream(
-          peer,
-          connection,
-          target.endpoint,
-        ).subscribe(
+        const unsubscribe = upstream(peer, connection, target.endpoint).subscribe(
           {
             query: payload.query,
             variables: payload.variables ?? undefined,
@@ -173,13 +160,11 @@ export default defineWebSocketHandler({
             next: (result) => send({ type: "next", id, payload: result }),
             error: (error) => {
               connection.subscriptions.delete(id);
-              if (Array.isArray(error))
-                send({ type: "error", id, payload: error });
+              if (Array.isArray(error)) send({ type: "error", id, payload: error });
               else peer.close(CLOSE_RECONNECT, "Upstream error");
             },
             complete: () => {
-              if (connection.subscriptions.delete(id))
-                send({ type: "complete", id });
+              if (connection.subscriptions.delete(id)) send({ type: "complete", id });
             },
           },
         );

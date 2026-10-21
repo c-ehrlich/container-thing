@@ -11,19 +11,13 @@ import { getFreshSession } from "../railway-oauth";
  * that follows carries a usable token. The relay can't refresh it itself: it has no response to set
  * a cookie on.
  */
-const ensureLiveSession = createServerFn({ method: "POST" }).handler(
-  async () => ({
-    signedIn: (await getFreshSession()) !== null,
-  }),
-);
+const ensureLiveSession = createServerFn({ method: "POST" }).handler(async () => ({
+  signedIn: (await getFreshSession()) !== null,
+}));
 
 class SignedOutError extends Error {}
 
-export type LiveConnection =
-  | "connecting"
-  | "connected"
-  | "reconnecting"
-  | "signed-out";
+export type LiveConnection = "connecting" | "connected" | "reconnecting" | "signed-out";
 
 let connection: LiveConnection = "connecting";
 const connectionListeners = new Set<() => void>();
@@ -54,8 +48,7 @@ function liveClient(): Client {
     retryAttempts: Number.POSITIVE_INFINITY,
     shouldRetry: (error) => !(error instanceof SignedOutError),
     on: {
-      connecting: (isRetry) =>
-        setConnection(isRetry ? "reconnecting" : "connecting"),
+      connecting: (isRetry) => setConnection(isRetry ? "reconnecting" : "connecting"),
       connected: (_socket, _payload, wasRetry) => {
         setConnection("connected");
         // Events may have been missed while disconnected.

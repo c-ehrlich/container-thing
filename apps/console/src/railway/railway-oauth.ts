@@ -1,32 +1,17 @@
-import {
-  deleteCookie,
-  getCookie,
-  setCookie,
-} from "@tanstack/react-start/server";
-import {
-  CodeChallengeMethod,
-  OAuth2Client,
-  generateCodeVerifier,
-  generateState,
-} from "arctic";
+import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
+import { CodeChallengeMethod, OAuth2Client, generateCodeVerifier, generateState } from "arctic";
 import type { OAuth2Tokens } from "arctic";
 
-import { AUTHORIZATION_ENDPOINT, TOKEN_ENDPOINT } from "./consts";
 import { env } from "../server/env";
 import type { Session } from "../server/session";
 import { cookieDefaults, readSession, writeSession } from "../server/session";
+import { AUTHORIZATION_ENDPOINT, TOKEN_ENDPOINT } from "./consts";
 
 /**
  * `offline_access` returns a refresh token.
  * `project:member` lets the user pick which projects this app may manage on the consent screen.
  */
-const SCOPES = [
-  "openid",
-  "email",
-  "profile",
-  "offline_access",
-  "project:member",
-];
+const SCOPES = ["openid", "email", "profile", "offline_access", "project:member"];
 
 /** Short-lived cookies holding the in-flight sign-in attempt. */
 const STATE_COOKIE = "railway_oauth_state";
@@ -39,15 +24,10 @@ const railwayOAuth = () =>
     new URL("/auth/callback", env.APP_URL).toString(),
   );
 
-function sessionFromTokens(
-  tokens: OAuth2Tokens,
-  previousRefreshToken: string | null,
-): Session {
+function sessionFromTokens(tokens: OAuth2Tokens, previousRefreshToken: string | null): Session {
   return {
     accessToken: tokens.accessToken(),
-    refreshToken: tokens.hasRefreshToken()
-      ? tokens.refreshToken()
-      : previousRefreshToken,
+    refreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : previousRefreshToken,
     accessTokenExpiresAt: tokens.accessTokenExpiresAt().getTime(),
   };
 }
@@ -76,9 +56,7 @@ export function startLogin(): string {
   return url.toString();
 }
 
-export type LoginResult =
-  | { ok: true }
-  | { ok: false; status: 400 | 502; message: string };
+export type LoginResult = { ok: true } | { ok: false; status: 400 | 502; message: string };
 
 /**
  * Handles Railway's redirect back
@@ -86,9 +64,7 @@ export type LoginResult =
  * - exchanges the code for tokens
  * - stores the session.
  */
-export async function finishLogin(
-  params: URLSearchParams,
-): Promise<LoginResult> {
+export async function finishLogin(params: URLSearchParams): Promise<LoginResult> {
   const expectedState = getCookie(STATE_COOKIE);
   const codeVerifier = getCookie(VERIFIER_COOKIE);
   deleteCookie(STATE_COOKIE, cookieDefaults());
@@ -106,13 +82,7 @@ export async function finishLogin(
 
   const code = params.get("code");
   const state = params.get("state");
-  if (
-    !code ||
-    !state ||
-    !expectedState ||
-    !codeVerifier ||
-    state !== expectedState
-  ) {
+  if (!code || !state || !expectedState || !codeVerifier || state !== expectedState) {
     return {
       ok: false,
       status: 400,
@@ -149,8 +119,7 @@ const REFRESH_MARGIN_MS = 60_000;
 export async function getFreshSession(): Promise<Session | null> {
   const session = await readSession();
   if (!session) return null;
-  if (session.accessTokenExpiresAt - Date.now() > REFRESH_MARGIN_MS)
-    return session;
+  if (session.accessTokenExpiresAt - Date.now() > REFRESH_MARGIN_MS) return session;
   if (!session.refreshToken) return null;
 
   try {
