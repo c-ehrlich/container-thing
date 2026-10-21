@@ -6,6 +6,7 @@ import { graphql } from "./graphql/graphql";
 import { projectQuery } from "./project";
 import type { RailwayClient } from "./railway-api";
 import { requireRailway } from "./require-railway";
+import { deploymentMeta, domainsOf, oneDayAgo, sourceOf } from "./service-fields";
 
 /** One service in one environment: its settings, its deploys and its last day of CPU and memory. */
 const ServiceQuery = graphql(`
@@ -61,19 +62,13 @@ const ServiceQuery = graphql(`
   }
 `);
 
-const DeploymentMeta = z.object({
-  commitMessage: z.string().optional().catch(undefined),
-  image: z.string().optional().catch(undefined),
-});
-
 export async function fetchService(
   railway: RailwayClient,
   input: { serviceId: string; environmentId: string },
 ) {
-  const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { serviceInstance, deployments, metrics } = await railway(ServiceQuery, {
     ...input,
-    since,
+    since: oneDayAgo(),
   });
   const series = (measurement: string) =>
     (metrics.find((m) => m.measurement === measurement)?.values ?? [])
@@ -83,27 +78,24 @@ export async function fetchService(
   return {
     id: input.serviceId,
     name: serviceInstance.serviceName,
-    source: serviceInstance.source?.image ?? serviceInstance.source?.repo ?? null,
+    source: sourceOf(serviceInstance.source),
     region: serviceInstance.region,
     replicas: serviceInstance.numReplicas,
     sleepApplication: serviceInstance.sleepApplication,
     cronSchedule: serviceInstance.cronSchedule,
     nextCronRunAt: serviceInstance.nextCronRunAt,
-    domains: [
-      ...serviceInstance.domains.customDomains.map((d) => d.domain),
-      ...serviceInstance.domains.serviceDomains.map((d) => d.domain),
-    ],
+    domains: domainsOf(serviceInstance.domains),
     /** Newest first. */
     deployments: deployments.edges.map(({ node: deployment }) => {
-      const meta = DeploymentMeta.safeParse(deployment.meta ?? {});
+      const meta = deploymentMeta(deployment.meta);
       return {
         id: deployment.id,
         status: deployment.status,
         createdAt: deployment.createdAt,
         statusUpdatedAt: deployment.statusUpdatedAt,
         canRollback: deployment.canRollback,
-        commitMessage: meta.success ? meta.data.commitMessage : undefined,
-        image: meta.success ? meta.data.image : undefined,
+        commitMessage: meta.commitMessage,
+        image: meta.image,
         creator: deployment.creator?.name ?? null,
       };
     }),

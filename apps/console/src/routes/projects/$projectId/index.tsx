@@ -6,10 +6,11 @@ import { ArrowUpRightIcon, CircleCheckIcon } from "lucide-react";
 import { AddServiceDialog } from "../../../add-service/add-service-dialog";
 import { useDismissed } from "../../../overview/dismissed";
 import { DotGrid } from "../../../overview/dot-grid";
-import { healthOf, primaryEnvironment } from "../../../overview/health";
+import { KIND_DOT, healthOf, primaryEnvironment } from "../../../overview/health";
 import type { Kind } from "../../../overview/health";
 import { insightsFor } from "../../../overview/insights";
 import { InsightItem } from "../../../overview/insights-panel";
+import { MonthlyCost } from "../../../overview/monthly-cost";
 import { TopologyDiagram } from "../../../overview/topology-diagram";
 import { ServiceTable } from "../../../project/service-table";
 import { projectOverviewQuery, projectUsageQuery } from "../../../railway/overview";
@@ -20,14 +21,6 @@ export const Route = createFileRoute("/projects/$projectId/")({
 
 const projectRoute = getRouteApi("/projects/$projectId");
 const rootRoute = getRouteApi("__root__");
-
-const DOT: Record<Kind, string> = {
-  running: "bg-success",
-  sleeping: "bg-muted-foreground/60",
-  pending: "bg-warning",
-  failed: "bg-destructive",
-  stopped: "bg-muted-foreground/30",
-};
 
 /**
  * One project, one environment at a time: what's wrong and what to do about it, the shape of the
@@ -74,15 +67,7 @@ function ProjectPage() {
               <ArrowUpRightIcon className="size-3.5" />
             </a>
           ))}
-          {usage?.estimatedMonthlyUsd !== undefined && (
-            <span
-              className="tabular-nums"
-              title="This month's usage so far, projected to the end of the month at Railway's list prices. Plan credits aren't included."
-            >
-              ≈ ${usage.estimatedMonthlyUsd.toFixed(usage.estimatedMonthlyUsd < 10 ? 2 : 0)}
-              <span className="text-muted-foreground">/mo</span>
-            </span>
-          )}
+          <MonthlyCost usage={usage} />
         </div>
       </header>
 
@@ -99,7 +84,9 @@ function ProjectPage() {
                 env.id === environment?.id && "border-primary font-medium text-foreground",
               )}
             >
-              <span className={cn("size-1.5 rounded-full", DOT[healthOf(project, env).kind])} />
+              <span
+                className={cn("size-1.5 rounded-full", KIND_DOT[healthOf(project, env).kind])}
+              />
               {env.name}
               <span className="text-xs text-muted-foreground tabular-nums">
                 {env.services.length}
@@ -180,7 +167,7 @@ function Verdict(props: { kind: Kind; worst?: string }) {
             : "Off";
   return (
     <p className="flex items-center gap-2 text-sm text-muted-foreground">
-      <span className={cn("size-2 rounded-full", DOT[kind])} />
+      <span className={cn("size-2 rounded-full", KIND_DOT[kind])} />
       {label}
     </p>
   );

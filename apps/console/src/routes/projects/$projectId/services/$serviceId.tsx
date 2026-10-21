@@ -5,7 +5,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { CircleAlertIcon, CircleXIcon, GlobeIcon, InfoIcon } from "lucide-react";
 import { useState } from "react";
 
-import { primaryEnvironment, timeAgo } from "../../../../overview/health";
+import { KIND_DOT, primaryEnvironment, timeAgo } from "../../../../overview/health";
 import { InsightActionButton } from "../../../../overview/insight-action";
 import { insightsFor } from "../../../../overview/insights";
 import type { Insight } from "../../../../overview/insights";
@@ -113,7 +113,7 @@ function ServicePage() {
                     e.id === environment.id && "bg-muted text-foreground",
                   )}
                 >
-                  <span className={cn("size-1.5 rounded-full", DOT[kind])} />
+                  <span className={cn("size-1.5 rounded-full", KIND_DOT[kind])} />
                   {e.name}
                 </Link>
               );
@@ -135,14 +135,6 @@ function ServicePage() {
     </div>
   );
 }
-
-const DOT = {
-  running: "bg-success",
-  sleeping: "bg-muted-foreground/60",
-  pending: "bg-warning",
-  failed: "bg-destructive",
-  stopped: "bg-muted-foreground/30",
-};
 
 const SEVERITY = {
   critical: {
