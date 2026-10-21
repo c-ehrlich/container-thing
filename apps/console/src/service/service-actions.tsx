@@ -1,18 +1,10 @@
-import { Button } from "@repo/ui/primitives/button";
-import { Spinner } from "@repo/ui/primitives/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlayIcon, RotateCcwIcon, RotateCwIcon, SquareIcon, XIcon } from "lucide-react";
 
 import { InsightActionButton } from "../overview/insight-action";
+import { ActionButton } from "../railway/action-button";
 import { deploymentState } from "../railway/deployment-state";
 import type { Deployment } from "../railway/project";
-import {
-  cancelDeploymentFn,
-  deployServiceFn,
-  projectQuery,
-  removeDeploymentFn,
-  restartDeploymentFn,
-} from "../railway/project";
+import { deployServiceFn, deploymentActionFn } from "../railway/project";
 
 type Target = {
   projectId: string;
@@ -46,7 +38,9 @@ export function ServiceActions(props: Target) {
           pending="Restarting…"
           icon={<RotateCwIcon data-icon="inline-start" />}
           title="Restarts the current deployment without building again"
-          run={() => restartDeploymentFn({ data: { deploymentId: deployment.id } })}
+          run={() =>
+            deploymentActionFn({ data: { deploymentId: deployment.id, action: "restart" } })
+          }
         />
       )}
       {kind === "stopped" ? (
@@ -74,7 +68,9 @@ export function ServiceActions(props: Target) {
           label="Cancel deploy"
           pending="Cancelling…"
           icon={<XIcon data-icon="inline-start" />}
-          run={() => cancelDeploymentFn({ data: { deploymentId: deployment.id } })}
+          run={() =>
+            deploymentActionFn({ data: { deploymentId: deployment.id, action: "cancel" } })
+          }
         />
       )}
       {deployment && hasContainer && (
@@ -84,7 +80,9 @@ export function ServiceActions(props: Target) {
           pending="Stopping…"
           icon={<SquareIcon data-icon="inline-start" />}
           title="Removes the running deployment. Start deploys it again."
-          run={() => removeDeploymentFn({ data: { deploymentId: deployment.id } })}
+          run={() =>
+            deploymentActionFn({ data: { deploymentId: deployment.id, action: "remove" } })
+          }
         />
       )}
       <InsightActionButton
@@ -100,39 +98,5 @@ export function ServiceActions(props: Target) {
         }}
       />
     </div>
-  );
-}
-
-/**
- * A button for one Railway call. Afterwards the project is refetched everywhere it's shown: the
- * overview, project and service queries all live under `projectQuery`'s key.
- */
-export function ActionButton(props: {
-  projectId: string;
-  label: string;
-  pending: string;
-  run: () => Promise<unknown>;
-  icon?: React.ReactNode;
-  title?: string;
-  variant?: "default" | "outline" | "ghost";
-}) {
-  const queryClient = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: props.run,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: projectQuery(props.projectId).queryKey }),
-  });
-
-  return (
-    <Button
-      size="sm"
-      variant={mutation.isError ? "destructive" : (props.variant ?? "outline")}
-      disabled={mutation.isPending}
-      title={mutation.error?.message ?? props.title}
-      onClick={() => mutation.mutate()}
-    >
-      {mutation.isPending ? <Spinner data-icon="inline-start" /> : props.icon}
-      {mutation.isPending ? props.pending : mutation.isError ? "Try again" : props.label}
-    </Button>
   );
 }

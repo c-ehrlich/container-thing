@@ -193,13 +193,6 @@ export const createServiceFn = createServerFn({ method: "POST" })
   .validator(NewService)
   .handler(({ data, context }) => createService(context.railway, data));
 
-export const removeDeploymentFn = createServerFn({ method: "POST" })
-  .middleware([requireRailway])
-  .validator(z.object({ deploymentId: z.string() }))
-  .handler(async ({ data, context }) => {
-    await removeDeployment(context.railway, data.deploymentId);
-  });
-
 /**
  * The one cache entry for a project's services and deployments. The project page and the chat widgets
  * both read it, and `useWatchEnvironment` keeps it live, so they always show the same state.
@@ -210,30 +203,31 @@ export const projectQuery = (projectId: string) =>
     queryFn: () => getProjectFn({ data: { projectId } }),
   });
 
-const DeploymentId = z.object({ deploymentId: z.string() });
+const DEPLOYMENT_MUTATIONS = {
+  /** Restarts the container as it is, without building again. */
+  restart: RestartMutation,
+  /** Deploys an earlier deployment's image again, replacing what's running. */
+  rollback: RollbackMutation,
+  /** Stops a deployment that is still building or deploying. */
+  cancel: CancelMutation,
+  /** Takes the deployment down; the service stays off until it's deployed again. */
+  remove: RemoveMutation,
+};
 
-/** Restarts a deployment's container as it is, without building again. */
-export const restartDeploymentFn = createServerFn({ method: "POST" })
-  .middleware([requireRailway])
-  .validator(DeploymentId)
-  .handler(async ({ data, context }) => {
-    await context.railway(RestartMutation, { id: data.deploymentId });
-  });
+export type DeploymentAction = keyof typeof DEPLOYMENT_MUTATIONS;
 
-/** Deploys an earlier deployment's image again, replacing what's running. */
-export const rollbackDeploymentFn = createServerFn({ method: "POST" })
+export const deploymentActionFn = createServerFn({ method: "POST" })
   .middleware([requireRailway])
-  .validator(DeploymentId)
+  .validator(
+    z.object({
+      deploymentId: z.string(),
+      action: z.enum(["restart", "rollback", "cancel", "remove"]),
+    }),
+  )
   .handler(async ({ data, context }) => {
-    await context.railway(RollbackMutation, { id: data.deploymentId });
-  });
-
-/** Stops a deployment that is still building or deploying. */
-export const cancelDeploymentFn = createServerFn({ method: "POST" })
-  .middleware([requireRailway])
-  .validator(DeploymentId)
-  .handler(async ({ data, context }) => {
-    await context.railway(CancelMutation, { id: data.deploymentId });
+    await context.railway<unknown, { id: string }>(DEPLOYMENT_MUTATIONS[data.action], {
+      id: data.deploymentId,
+    });
   });
 
 /**
