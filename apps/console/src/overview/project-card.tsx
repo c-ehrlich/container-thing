@@ -7,8 +7,7 @@ import { useState } from "react";
 import { AddServiceDialog } from "../add-service/add-service-dialog";
 import type { ProjectOverview, ProjectUsage } from "../railway/overview";
 import { DotGrid } from "./dot-grid";
-import { KIND_DOT, KIND_TEXT, healthOf, primaryEnvironment, servicesOf, timeAgo } from "./health";
-import type { Health, Kind } from "./health";
+import { KIND_DOT, KIND_TEXT, healthOf, primaryEnvironment, servicesOf, verdictOf } from "./health";
 import { MonthlyCost } from "./monthly-cost";
 import { TopologyDiagram } from "./topology-diagram";
 
@@ -97,18 +96,4 @@ export function ProjectCard(props: { project: ProjectOverview; usage?: ProjectUs
       </div>
     </article>
   );
-}
-
-function verdictOf(health: Health): { kind: Kind; label: string } {
-  const worst = health.attention[0];
-  if (health.kind === "failed" && worst) {
-    const ago = worst.deployment ? ` ${timeAgo(worst.deployment.createdAt)} ago` : "";
-    return { kind: "failed", label: `${worst.name} ${worst.state.label.toLowerCase()}${ago}` };
-  }
-  if (health.kind === "pending" && worst) {
-    return { kind: "pending", label: `${worst.state.label} ${worst.name}` };
-  }
-  if (health.counts.running > 0) return { kind: "running", label: "Healthy" };
-  if (health.counts.sleeping > 0) return { kind: "sleeping", label: "Asleep" };
-  return { kind: "stopped", label: "Off" };
 }
