@@ -30,6 +30,11 @@ import type { Viewer } from "../railway/viewer";
  */
 const HEADER_HEIGHT = "h-12 justify-center py-0";
 const FOOTER_HEIGHT = "h-14 justify-center py-0";
+/**
+ * Collapsed, these buttons drop their padding so the 32px icon fills the strip's 32px slot. Expanded,
+ * they drop only the left padding, so the icon stays in the same spot instead of sliding by 8px.
+ */
+const ICON_BUTTON = "h-10 pl-0";
 
 /** Left navigation: switch projects, jump between pages, and the signed-in user. */
 export function AppSidebar({ viewer }: { viewer: Viewer }) {
@@ -84,7 +89,7 @@ function ProjectSwitcher({ viewer, projectId }: { viewer: Viewer; projectId?: st
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="h-10" />}>
+          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className={ICON_BUTTON} />}>
             <Monogram name={current?.name ?? "?"} />
             <div className="grid flex-1 text-left leading-tight">
               <span className="truncate font-medium">{current?.name ?? "Select a project"}</span>
@@ -126,7 +131,7 @@ function UserMenu({ user }: { user: Viewer["user"] }) {
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="h-10" />}>
+          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className={ICON_BUTTON} />}>
             <Avatar>
               <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
             </Avatar>
