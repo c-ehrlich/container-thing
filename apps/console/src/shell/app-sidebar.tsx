@@ -17,9 +17,18 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
 } from "@repo/ui/primitives/sidebar";
 import { Link, useMatch } from "@tanstack/react-router";
-import { BoxesIcon, ChevronsUpDownIcon, LayoutGridIcon, LogOutIcon } from "lucide-react";
+import {
+  ArrowUpRightIcon,
+  BoxesIcon,
+  ChevronsUpDownIcon,
+  FileTextIcon,
+  LayoutGridIcon,
+  LogOutIcon,
+  TrainFrontIcon,
+} from "lucide-react";
 
 import type { Viewer } from "../railway/viewer";
 
@@ -35,6 +44,12 @@ const FOOTER_HEIGHT = "h-14 justify-center py-0";
  * they drop only the left padding, so the icon stays in the same spot instead of sliding by 8px.
  */
 const ICON_BUTTON = "h-10 pl-0";
+
+/** Railway's own help, opened in a new tab and set apart from the console's pages. */
+const RESOURCES = [
+  { label: "Docs", href: "https://docs.railway.com", icon: FileTextIcon },
+  { label: "Central Station", href: "https://station.railway.com", icon: TrainFrontIcon },
+];
 
 /** Left navigation: switch projects, jump between pages, and the signed-in user. */
 export function AppSidebar({ viewer }: { viewer: Viewer }) {
@@ -68,6 +83,31 @@ export function AppSidebar({ viewer }: { viewer: Viewer }) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
+          </SidebarMenu>
+        </SidebarGroup>
+        <SidebarSeparator />
+        <SidebarGroup>
+          <SidebarMenu>
+            {RESOURCES.map((resource) => (
+              <SidebarMenuItem key={resource.href}>
+                <SidebarMenuButton
+                  tooltip={resource.label}
+                  className="text-muted-foreground"
+                  render={
+                    <a
+                      href={resource.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`${resource.label} (opens in a new tab)`}
+                    />
+                  }
+                >
+                  <resource.icon />
+                  <span>{resource.label}</span>
+                  <ArrowUpRightIcon className="size-3!" />
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
