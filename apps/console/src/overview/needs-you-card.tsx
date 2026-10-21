@@ -6,7 +6,7 @@ import { CircleXIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import type { ProjectUsage } from "../railway/overview";
 import { DotGrid } from "./dot-grid";
 import { timeAgo } from "./health";
-import { InsightActionButton } from "./insight-action";
+import { InsightButtons } from "./insight-action";
 import type { Insight } from "./insights";
 import { TopologyDiagram } from "./topology-diagram";
 
@@ -55,16 +55,7 @@ export function NeedsYouCard(props: {
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 pl-8">
-          <InsightActionButton action={insight.primary} projectId={project.id} variant="default" />
-          {insight.secondary && (
-            <InsightActionButton
-              action={insight.secondary}
-              projectId={project.id}
-              variant="outline"
-            />
-          )}
-        </div>
+        <InsightButtons insight={insight} className="pl-8" />
       </div>
       <DotGrid className="relative min-h-44 border-t border-destructive/20 @2xl:border-t-0 @2xl:border-l">
         <TopologyDiagram

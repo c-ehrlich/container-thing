@@ -1,14 +1,14 @@
 import { cn } from "@repo/ui/lib/utils";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@repo/ui/primitives/empty";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
-import { CircleAlertIcon, CircleXIcon, GlobeIcon, InfoIcon } from "lucide-react";
+import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { GlobeIcon } from "lucide-react";
 import { useState } from "react";
 
+import { useDismissed } from "../../../../overview/dismissed";
 import { KIND_DOT, primaryEnvironment, timeAgo } from "../../../../overview/health";
-import { InsightActionButton } from "../../../../overview/insight-action";
 import { insightsFor } from "../../../../overview/insights";
-import type { Insight } from "../../../../overview/insights";
+import { InsightItem } from "../../../../overview/insights-panel";
 import { deploymentState } from "../../../../railway/deployment-state";
 import { projectOverviewQuery } from "../../../../railway/overview";
 import type { ProjectOverview } from "../../../../railway/overview";
@@ -47,11 +47,14 @@ export const Route = createFileRoute("/projects/$projectId/services/$serviceId")
   component: ServicePage,
 });
 
+const projectRoute = getRouteApi("/projects/$projectId");
+
 /** One service in one environment: what it's doing, its logs and deploys, and what to do about it. */
 function ServicePage() {
   const { projectId, serviceId } = Route.useParams();
   const search = Route.useSearch();
   const { data: project } = useSuspenseQuery(projectOverviewQuery(projectId));
+  const dismissed = useDismissed(projectRoute.useLoaderData().dismissed);
   const environment = environmentOf(project, serviceId, search.environmentId);
   const service = environment?.services.find((s) => s.id === serviceId);
 
@@ -70,7 +73,10 @@ function ServicePage() {
     e.services.some((s) => s.id === serviceId),
   );
   const insights = insightsFor([{ project }]).filter(
-    (i) => i.service?.id === serviceId && i.service.environment.id === environment.id,
+    (i) =>
+      i.service?.id === serviceId &&
+      i.service.environment.id === environment.id &&
+      !dismissed.isDismissed(i.key),
   );
 
   return (
@@ -123,7 +129,11 @@ function ServicePage() {
       </header>
 
       {insights.map((insight) => (
-        <InsightBanner key={insight.key} insight={insight} />
+        <InsightItem
+          key={insight.key}
+          insight={insight}
+          onDismiss={() => dismissed.dismiss(insight.key)}
+        />
       ))}
 
       <ServiceBody
@@ -133,62 +143,6 @@ function ServicePage() {
         currentDeploymentId={service.deployment?.id}
       />
     </div>
-  );
-}
-
-const SEVERITY = {
-  critical: {
-    icon: CircleXIcon,
-    className: "border-destructive/30 bg-destructive/5",
-    iconClass: "text-destructive",
-  },
-  warning: {
-    icon: CircleAlertIcon,
-    className: "border-warning/30 bg-warning/5",
-    iconClass: "text-warning",
-  },
-  info: { icon: InfoIcon, className: "bg-card/60", iconClass: "text-muted-foreground" },
-} satisfies Record<
-  Insight["severity"],
-  { icon: typeof InfoIcon; className: string; iconClass: string }
->;
-
-/** What the rules make of this service right now, with the fix they'd pick. */
-function InsightBanner(props: { insight: Insight }) {
-  const { insight } = props;
-  const style = SEVERITY[insight.severity];
-  return (
-    <section className={cn("flex gap-3 rounded-xl border p-4", style.className)}>
-      <style.icon className={cn("mt-0.5 size-5 shrink-0", style.iconClass)} />
-      <div className="grid min-w-0 gap-1">
-        <p className="font-medium text-pretty">{insight.headline}</p>
-        <p className="text-sm text-pretty text-muted-foreground">{insight.evidence}</p>
-        {insight.impact && (
-          <p
-            className={cn(
-              "text-sm",
-              insight.impact.dependents.length > 0 ? "text-warning" : "text-muted-foreground",
-            )}
-          >
-            {insight.impact.text}
-          </p>
-        )}
-        <div className="mt-2 flex flex-wrap gap-2">
-          <InsightActionButton
-            action={insight.primary}
-            projectId={insight.project.id}
-            variant="default"
-          />
-          {insight.secondary && (
-            <InsightActionButton
-              action={insight.secondary}
-              projectId={insight.project.id}
-              variant="outline"
-            />
-          )}
-        </div>
-      </div>
-    </section>
   );
 }
 

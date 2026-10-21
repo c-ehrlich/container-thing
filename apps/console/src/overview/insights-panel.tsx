@@ -7,7 +7,7 @@ import {
   LightbulbIcon,
 } from "lucide-react";
 
-import { InsightActionButton } from "./insight-action";
+import { InsightButtons } from "./insight-action";
 import type { Insight } from "./insights";
 import { DismissButton } from "./needs-you-card";
 
@@ -95,20 +95,7 @@ export function InsightItem(props: { insight: Insight; onDismiss: () => void }) 
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 pl-6.5">
-        <InsightActionButton
-          action={insight.primary}
-          projectId={insight.project.id}
-          variant={insight.severity === "critical" ? "default" : "outline"}
-        />
-        {insight.secondary && (
-          <InsightActionButton
-            action={insight.secondary}
-            projectId={insight.project.id}
-            variant="ghost"
-          />
-        )}
-      </div>
+      <InsightButtons insight={insight} className="pl-6.5" />
       <DismissButton onDismiss={props.onDismiss} className="top-2 right-2" />
     </article>
   );
