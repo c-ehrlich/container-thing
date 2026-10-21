@@ -69,7 +69,7 @@ function ServiceRow(props: {
   insight?: Insight;
 }) {
   const { project, service, usage, insight } = props;
-  const deployment = project.deployments.find((d) => d.id === service.deployment?.id);
+  const { deployment } = service;
   const action = primaryActionFor(service, insight);
   const cpu = usage?.cpu.at(-1);
   const memory = usage?.memoryGb.at(-1);
@@ -135,8 +135,6 @@ function ServiceRow(props: {
               {timeAgo(deployment.createdAt)} ago
             </span>
           </>
-        ) : service.deployment ? (
-          <span className="text-muted-foreground">{timeAgo(service.deployment.createdAt)} ago</span>
         ) : (
           !service.hasEverDeployed && <span className="text-muted-foreground">Never deployed</span>
         )}

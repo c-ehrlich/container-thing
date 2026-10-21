@@ -141,9 +141,7 @@ function Overview(props: { viewer: Viewer }) {
           <section className="grid gap-2">
             <SectionLabel>In flight</SectionLabel>
             {inFlight.map(({ project, service }) => {
-              const commit = project.deployments.find(
-                (d) => d.id === service.deployment?.id,
-              )?.commitMessage;
+              const commit = service.deployment?.commitMessage;
               return (
                 <div
                   key={`${service.environment.id}-${service.id}`}
