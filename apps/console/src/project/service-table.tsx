@@ -2,7 +2,7 @@ import { cn } from "@repo/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon, DatabaseIcon } from "lucide-react";
 
-import { KIND_ORDER, servicesOf, timeAgo } from "../overview/health";
+import { KIND_ORDER, isDatastore, servicesOf, timeAgo } from "../overview/health";
 import type { ServiceWithState } from "../overview/health";
 import { InsightActionButton } from "../overview/insight-action";
 import type { Insight } from "../overview/insights";
@@ -62,9 +62,6 @@ export function ServiceTable(props: {
   );
 }
 
-/** Matched on the image or repo name without its tag. */
-const DATASTORE = /postgres|mysql|mariadb|redis|valkey|mongo|clickhouse|kafka|minio/;
-
 function ServiceRow(props: {
   project: ProjectOverview;
   service: ServiceWithState;
@@ -76,7 +73,6 @@ function ServiceRow(props: {
   const action = primaryActionFor(service, insight);
   const cpu = usage?.cpu.at(-1);
   const memory = usage?.memoryGb.at(-1);
-  const datastore = DATASTORE.test((service.source ?? service.name).split(":")[0] ?? "");
   const live = service.state.kind === "running" || service.state.kind === "pending";
 
   return (
@@ -88,7 +84,9 @@ function ServiceRow(props: {
       )}
     >
       <div className="flex min-w-0 items-center gap-2.5">
-        {datastore && <DatabaseIcon className="size-3.5 shrink-0 text-muted-foreground" />}
+        {isDatastore(service) && (
+          <DatabaseIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        )}
         <div className="grid min-w-0">
           <Link
             to="/projects/$projectId/services/$serviceId"

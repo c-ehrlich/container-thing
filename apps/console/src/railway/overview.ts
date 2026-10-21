@@ -8,6 +8,7 @@ import { liveTarget } from "./live/environment-live";
 import type { RailwayClient } from "./railway-api";
 import { referencedServices } from "./references";
 import { requireRailway } from "./require-railway";
+import { deploymentMeta, domainsOf, oneDayAgo, sourceOf } from "./service-fields";
 
 /**
  * Everything the projects overview shows about one project, in one request: each environment's services
@@ -84,12 +85,6 @@ const ProjectOverviewQuery = graphql(`
   }
 `);
 
-/** The parts of `deployment.meta` we show. It's untyped JSON; commit fields only exist for GitHub deploys. */
-const DeploymentMeta = z.object({
-  commitMessage: z.string().optional().catch(undefined),
-  image: z.string().optional().catch(undefined),
-});
-
 /** A project for the overview, flattened from Railway's connection types. */
 export async function fetchProjectOverview(railway: RailwayClient, projectId: string) {
   const { project, deployments } = await railway(ProjectOverviewQuery, { id: projectId });
@@ -98,11 +93,8 @@ export async function fetchProjectOverview(railway: RailwayClient, projectId: st
     const services = environment.serviceInstances.edges.map(({ node: instance }) => ({
       id: instance.serviceId,
       name: instance.serviceName,
-      source: instance.source?.image ?? instance.source?.repo ?? null,
-      domains: [
-        ...instance.domains.customDomains.map((d) => d.domain),
-        ...instance.domains.serviceDomains.map((d) => d.domain),
-      ],
+      source: sourceOf(instance.source),
+      domains: domainsOf(instance.domains),
       // Null once every deployment is removed (a stopped service) as well as before the first one.
       deployment: instance.latestDeployment,
       hasEverDeployed: instance.hasEverDeployed,
@@ -132,19 +124,16 @@ export async function fetchProjectOverview(railway: RailwayClient, projectId: st
     name: project.name,
     primaryEnvironmentId: project.primaryEnvironmentId,
     environments,
-    deployments: deployments.edges.map(({ node: deployment }) => {
-      const meta = DeploymentMeta.safeParse(deployment.meta ?? {});
-      return {
-        id: deployment.id,
-        status: deployment.status,
-        createdAt: deployment.createdAt,
-        serviceId: deployment.serviceId,
-        environmentId: deployment.environmentId,
-        canRollback: deployment.canRollback,
-        commitMessage: meta.success ? meta.data.commitMessage : undefined,
-        creator: deployment.creator?.name ?? null,
-      };
-    }),
+    deployments: deployments.edges.map(({ node: deployment }) => ({
+      id: deployment.id,
+      status: deployment.status,
+      createdAt: deployment.createdAt,
+      serviceId: deployment.serviceId,
+      environmentId: deployment.environmentId,
+      canRollback: deployment.canRollback,
+      commitMessage: deploymentMeta(deployment.meta).commitMessage,
+      creator: deployment.creator?.name ?? null,
+    })),
   };
 }
 
@@ -217,7 +206,7 @@ export const serviceUsageKey = (environmentId: string, serviceId: string) =>
  * per project here: asking per workspace isn't authorized for OAuth apps.
  */
 export async function fetchProjectUsage(railway: RailwayClient, projectId: string) {
-  const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const since = oneDayAgo();
   // Asked separately, so one Railway refuses doesn't take the other down with it.
   const [metricsResult, estimateResult] = await Promise.allSettled([
     railway(ProjectMetricsQuery, { id: projectId, since, sampleSeconds: SAMPLE_SECONDS }),

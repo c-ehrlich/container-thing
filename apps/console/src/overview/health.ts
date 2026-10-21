@@ -7,6 +7,31 @@ export type Kind = DeploymentState["kind"];
 /** Worst first: what the overview surfaces before anything else. */
 export const KIND_ORDER: Kind[] = ["failed", "pending", "running", "sleeping", "stopped"];
 
+/** A status dot's color for each kind. */
+export const KIND_DOT: Record<Kind, string> = {
+  running: "bg-success",
+  sleeping: "bg-muted-foreground/60",
+  pending: "bg-warning",
+  failed: "bg-destructive",
+  stopped: "bg-muted-foreground/30",
+};
+
+/** Status text's color for each kind. */
+export const KIND_TEXT: Record<Kind, string> = {
+  running: "text-success",
+  sleeping: "text-muted-foreground",
+  pending: "text-warning",
+  failed: "text-destructive",
+  stopped: "text-muted-foreground/60",
+};
+
+/** Matched on the image or repo name without its tag: `umami:postgresql-latest` is an app. */
+const DATASTORE = /postgres|mysql|mariadb|redis|valkey|mongo|clickhouse|kafka|minio/;
+
+export function isDatastore(service: { name: string; source: string | null }) {
+  return DATASTORE.test((service.source ?? service.name).split(":")[0] ?? "");
+}
+
 export type ServiceWithState = OverviewService & {
   environment: OverviewEnvironment;
   state: DeploymentState;

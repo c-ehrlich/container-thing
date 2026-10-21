@@ -12,7 +12,7 @@ import { BoxIcon, DatabaseIcon } from "lucide-react";
 
 import { serviceUsageKey } from "../railway/overview";
 import type { OverviewEnvironment, ProjectOverview, ProjectUsage } from "../railway/overview";
-import { servicesOf, timeAgo } from "./health";
+import { KIND_TEXT, isDatastore, servicesOf, timeAgo } from "./health";
 import type { Kind, ServiceWithState } from "./health";
 import { formatCpu, formatMemory } from "./sparkline";
 
@@ -160,7 +160,7 @@ function ServiceDetails(props: {
     <>
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-sm font-medium">{node.name}</span>
-        <span className={cn("shrink-0", TEXT[node.state.kind])}>
+        <span className={cn("shrink-0", KIND_TEXT[node.state.kind])}>
           {node.state.label}
           {node.deployment && ` · ${timeAgo(node.deployment.createdAt)}`}
         </span>
@@ -182,14 +182,6 @@ function ServiceDetails(props: {
     </>
   );
 }
-
-const TEXT: Record<Kind, string> = {
-  running: "text-success",
-  sleeping: "text-muted-foreground",
-  pending: "text-warning",
-  failed: "text-destructive",
-  stopped: "text-muted-foreground",
-};
 
 const KEYFRAMES = `
 @keyframes topology-dash { to { stroke-dashoffset: -7; } }
@@ -306,9 +298,6 @@ function isLive(kind: Kind) {
   return kind === "running" || kind === "pending";
 }
 
-/** Matched on the image or repo name without its tag: `umami:postgresql-latest` is an app. */
-const DATASTORE = /postgres|mysql|mariadb|redis|valkey|mongo|clickhouse|kafka|minio/;
-
 /**
  * Layered left to right: a node's column is its longest chain of callers, then callers are pulled
  * right next to what they call so no edge skips a column. Rows within a column follow their
@@ -357,7 +346,7 @@ function layout(services: ServiceWithState[], links: [string, string][]): Node[]
     column.forEach(({ service }, row) => {
       const y = HEIGHT / 2 + (row - (column.length - 1) / 2) * ROW_GAP;
       placed.set(service.name, y);
-      const datastore = DATASTORE.test((service.source ?? service.name).split(":")[0] ?? "");
+      const datastore = isDatastore(service);
       nodes.push({
         ...service,
         x: (WIDTH / columns) * (c + 0.5),

@@ -7,25 +7,10 @@ import { useState } from "react";
 import { AddServiceDialog } from "../add-service/add-service-dialog";
 import type { ProjectOverview, ProjectUsage } from "../railway/overview";
 import { DotGrid } from "./dot-grid";
-import { healthOf, primaryEnvironment, servicesOf, timeAgo } from "./health";
+import { KIND_DOT, KIND_TEXT, healthOf, primaryEnvironment, servicesOf, timeAgo } from "./health";
 import type { Health, Kind } from "./health";
+import { MonthlyCost } from "./monthly-cost";
 import { TopologyDiagram } from "./topology-diagram";
-
-const TEXT: Record<Kind, string> = {
-  running: "text-success",
-  sleeping: "text-muted-foreground",
-  pending: "text-warning",
-  failed: "text-destructive",
-  stopped: "text-muted-foreground/60",
-};
-
-const DOT: Record<Kind, string> = {
-  running: "bg-success",
-  sleeping: "bg-muted-foreground/60",
-  pending: "bg-warning",
-  failed: "bg-destructive",
-  stopped: "bg-muted-foreground/30",
-};
 
 /**
  * A project as a card whose thumbnail is its architecture. Switching environments redraws the diagram;
@@ -72,7 +57,7 @@ export function ProjectCard(props: { project: ProjectOverview; usage?: ProjectUs
           >
             {project.name}
           </Link>
-          <span className={cn("shrink-0 text-xs", TEXT[verdict.kind])}>{verdict.label}</span>
+          <span className={cn("shrink-0 text-xs", KIND_TEXT[verdict.kind])}>{verdict.label}</span>
         </div>
 
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -87,14 +72,7 @@ export function ProjectCard(props: { project: ProjectOverview; usage?: ProjectUs
           ) : (
             <span className="text-muted-foreground/60">No public domain</span>
           )}
-          {usage?.estimatedMonthlyUsd !== undefined && (
-            <span
-              className="ml-auto shrink-0 tabular-nums"
-              title="This month's usage so far, projected to the end of the month at Railway's list prices. Plan credits aren't included."
-            >
-              ≈ ${usage.estimatedMonthlyUsd.toFixed(usage.estimatedMonthlyUsd < 10 ? 2 : 0)}/mo
-            </span>
-          )}
+          <MonthlyCost usage={usage} className="ml-auto shrink-0" />
         </div>
 
         {project.environments.length > 1 && (
@@ -108,7 +86,9 @@ export function ProjectCard(props: { project: ProjectOverview; usage?: ProjectUs
           >
             {project.environments.map((env) => (
               <ToggleGroupItem key={env.id} value={env.id} className="h-6 gap-1.5 px-2 text-xs">
-                <span className={cn("size-1.5 rounded-full", DOT[healthOf(project, env).kind])} />
+                <span
+                  className={cn("size-1.5 rounded-full", KIND_DOT[healthOf(project, env).kind])}
+                />
                 {env.name}
               </ToggleGroupItem>
             ))}
