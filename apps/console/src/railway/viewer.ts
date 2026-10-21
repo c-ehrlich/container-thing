@@ -11,6 +11,7 @@ const ViewerQuery = graphql(`
     me {
       name
       email
+      avatar
     }
     externalWorkspaces {
       id

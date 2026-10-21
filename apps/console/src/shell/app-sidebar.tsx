@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback } from "@repo/ui/primitives/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@repo/ui/primitives/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -173,6 +173,7 @@ function UserMenu({ user }: { user: Viewer["user"] }) {
         <DropdownMenu>
           <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className={ICON_BUTTON} />}>
             <Avatar>
+              {user.avatar && <AvatarImage src={user.avatar} alt="" />}
               <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left leading-tight">
