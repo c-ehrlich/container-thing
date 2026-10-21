@@ -24,10 +24,12 @@ import { BoxesIcon, ChevronsUpDownIcon, LayoutGridIcon, LogOutIcon } from "lucid
 import type { Viewer } from "../railway/viewer";
 
 /**
- * Collapsing to icons shrinks every menu button to 32px square, which would pull the nav up when
- * the large header and footer buttons lose 16px. They keep their height so nothing moves.
+ * Collapsing to icons shrinks the menu buttons to 32px squares, so the header and footer have fixed
+ * heights and center their button: nothing moves, and the hover area hugs the icon. The header is
+ * as tall as the top bar so the project icon lines up with the sidebar toggle there.
  */
-const KEEP_HEIGHT = "group-data-[collapsible=icon]:h-12!";
+const HEADER_HEIGHT = "h-12 justify-center py-0";
+const FOOTER_HEIGHT = "h-14 justify-center py-0";
 
 /** Left navigation: switch projects, jump between pages, and the signed-in user. */
 export function AppSidebar({ viewer }: { viewer: Viewer }) {
@@ -37,7 +39,7 @@ export function AppSidebar({ viewer }: { viewer: Viewer }) {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className={HEADER_HEIGHT}>
         <ProjectSwitcher viewer={viewer} projectId={projectId} />
       </SidebarHeader>
       <SidebarContent>
@@ -64,7 +66,7 @@ export function AppSidebar({ viewer }: { viewer: Viewer }) {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className={FOOTER_HEIGHT}>
         <UserMenu user={viewer.user} />
       </SidebarFooter>
       <SidebarRail />
@@ -82,7 +84,7 @@ function ProjectSwitcher({ viewer, projectId }: { viewer: Viewer; projectId?: st
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className={KEEP_HEIGHT} />}>
+          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="h-10" />}>
             <Monogram name={current?.name ?? "?"} />
             <div className="grid flex-1 text-left leading-tight">
               <span className="truncate font-medium">{current?.name ?? "Select a project"}</span>
@@ -124,7 +126,7 @@ function UserMenu({ user }: { user: Viewer["user"] }) {
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className={KEEP_HEIGHT} />}>
+          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="h-10" />}>
             <Avatar>
               <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
             </Avatar>
