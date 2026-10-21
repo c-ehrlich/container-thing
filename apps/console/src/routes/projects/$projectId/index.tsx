@@ -6,8 +6,7 @@ import { ArrowUpRightIcon, CircleCheckIcon } from "lucide-react";
 import { AddServiceDialog } from "../../../add-service/add-service-dialog";
 import { useDismissed } from "../../../overview/dismissed";
 import { DotGrid } from "../../../overview/dot-grid";
-import { KIND_DOT, healthOf, primaryEnvironment } from "../../../overview/health";
-import type { Kind } from "../../../overview/health";
+import { KIND_DOT, healthOf, primaryEnvironment, verdictOf } from "../../../overview/health";
 import { insightsFor } from "../../../overview/insights";
 import { InsightItem } from "../../../overview/insights-panel";
 import { MonthlyCost } from "../../../overview/monthly-cost";
@@ -44,7 +43,7 @@ function ProjectPage() {
       !dismissed.isDismissed(i.key) && (!i.service || i.service.environment.id === environment?.id),
   );
   const domains = environment?.services.flatMap((s) => s.domains) ?? [];
-  const health = healthOf(project, environment);
+  const verdict = verdictOf(healthOf(project, environment));
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-8 p-8">
@@ -52,7 +51,10 @@ function ProjectPage() {
         <div className="grid gap-1">
           {workspace && <p className="text-sm text-muted-foreground">{workspace.name}</p>}
           <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
-          <Verdict kind={health.kind} worst={health.attention[0]?.name} />
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className={cn("size-2 rounded-full", KIND_DOT[verdict.kind])} />
+            {verdict.label}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
           {domains.slice(0, 3).map((domain) => (
@@ -151,24 +153,4 @@ function highlightFor(insights: ReturnType<typeof insightsFor>) {
   return failure?.service
     ? { failed: failure.service.name, affected: failure.impact?.dependents ?? [] }
     : undefined;
-}
-
-function Verdict(props: { kind: Kind; worst?: string }) {
-  const { kind, worst } = props;
-  const label =
-    kind === "failed" && worst
-      ? `${worst} is down`
-      : kind === "pending" && worst
-        ? `Deploying ${worst}`
-        : kind === "running"
-          ? "Healthy"
-          : kind === "sleeping"
-            ? "Asleep"
-            : "Off";
-  return (
-    <p className="flex items-center gap-2 text-sm text-muted-foreground">
-      <span className={cn("size-2 rounded-full", KIND_DOT[kind])} />
-      {label}
-    </p>
-  );
 }

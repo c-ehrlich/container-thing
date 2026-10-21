@@ -82,6 +82,21 @@ export function healthOf(project: ProjectOverview, environment?: OverviewEnviron
   };
 }
 
+/** A project's state in a few words: the broken or deploying service by name, else how the rest is. */
+export function verdictOf(health: Health): { kind: Kind; label: string } {
+  const worst = health.attention[0];
+  if (health.kind === "failed" && worst) {
+    const ago = worst.deployment ? ` ${timeAgo(worst.deployment.createdAt)} ago` : "";
+    return { kind: "failed", label: `${worst.name} ${worst.state.label.toLowerCase()}${ago}` };
+  }
+  if (health.kind === "pending" && worst) {
+    return { kind: "pending", label: `${worst.state.label} ${worst.name}` };
+  }
+  if (health.counts.running > 0) return { kind: "running", label: "Healthy" };
+  if (health.counts.sleeping > 0) return { kind: "sleeping", label: "Asleep" };
+  return { kind: "stopped", label: "Off" };
+}
+
 /** "now", "7m", "3h", "2d": short enough for dense rows. */
 export function timeAgo(iso: string, now = Date.now()) {
   const minutes = Math.max(0, (now - Date.parse(iso)) / 60_000);
