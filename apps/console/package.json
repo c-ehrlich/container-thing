@@ -30,6 +30,7 @@
     "lucide-react": "^1.59.0",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "recharts": "^3.10.1",
     "streamdown": "^2.7.1",
     "zod": "^4.6.7"
   },

@@ -14,7 +14,9 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthLogoutRouteImport } from './routes/auth/logout'
-import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
+import { Route as ProjectsProjectIdRouteRouteImport } from './routes/projects/$projectId/route'
+import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as ProjectsProjectIdServicesServiceIdRouteImport } from './routes/projects/$projectId/services/$serviceId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -41,19 +43,32 @@ const AuthLogoutRoute = AuthLogoutRouteImport.update({
   path: '/auth/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
+const ProjectsProjectIdRouteRoute = ProjectsProjectIdRouteRouteImport.update({
   id: '/projects/$projectId',
   path: '/projects/$projectId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProjectsProjectIdRouteRoute,
+} as any)
+const ProjectsProjectIdServicesServiceIdRoute =
+  ProjectsProjectIdServicesServiceIdRouteImport.update({
+    id: '/services/$serviceId',
+    path: '/services/$serviceId',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/services/$serviceId': typeof ProjectsProjectIdServicesServiceIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -61,26 +76,31 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/services/$serviceId': typeof ProjectsProjectIdServicesServiceIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/services/$serviceId': typeof ProjectsProjectIdServicesServiceIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/projects/$projectId'
     | '/api/chat'
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
-    | '/projects/$projectId'
+    | '/projects/$projectId/'
+    | '/projects/$projectId/services/$serviceId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,23 +109,26 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/logout'
     | '/projects/$projectId'
+    | '/projects/$projectId/services/$serviceId'
   id:
     | '__root__'
     | '/'
+    | '/projects/$projectId'
     | '/api/chat'
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
-    | '/projects/$projectId'
+    | '/projects/$projectId/'
+    | '/projects/$projectId/services/$serviceId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ProjectsProjectIdRouteRoute: typeof ProjectsProjectIdRouteRouteWithChildren
   ApiChatRoute: typeof ApiChatRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthLogoutRoute: typeof AuthLogoutRoute
-  ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -149,19 +172,50 @@ declare module '@tanstack/react-router' {
       id: '/projects/$projectId'
       path: '/projects/$projectId'
       fullPath: '/projects/$projectId'
-      preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      preLoaderRoute: typeof ProjectsProjectIdRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/projects/$projectId/': {
+      id: '/projects/$projectId/'
+      path: '/'
+      fullPath: '/projects/$projectId/'
+      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/services/$serviceId': {
+      id: '/projects/$projectId/services/$serviceId'
+      path: '/services/$serviceId'
+      fullPath: '/projects/$projectId/services/$serviceId'
+      preLoaderRoute: typeof ProjectsProjectIdServicesServiceIdRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
     }
   }
 }
 
+interface ProjectsProjectIdRouteRouteChildren {
+  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
+  ProjectsProjectIdServicesServiceIdRoute: typeof ProjectsProjectIdServicesServiceIdRoute
+}
+
+const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
+  {
+    ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
+    ProjectsProjectIdServicesServiceIdRoute:
+      ProjectsProjectIdServicesServiceIdRoute,
+  }
+
+const ProjectsProjectIdRouteRouteWithChildren =
+  ProjectsProjectIdRouteRoute._addFileChildren(
+    ProjectsProjectIdRouteRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ProjectsProjectIdRouteRoute: ProjectsProjectIdRouteRouteWithChildren,
   ApiChatRoute: ApiChatRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthLogoutRoute: AuthLogoutRoute,
-  ProjectsProjectIdRoute: ProjectsProjectIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

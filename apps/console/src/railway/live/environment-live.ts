@@ -1,5 +1,5 @@
 import { QueryObserver } from "@tanstack/react-query";
-import type { QueryClient } from "@tanstack/react-query";
+import type { QueryClient, QueryKey, QueryObserverOptions } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { graphql } from "../graphql/graphql";
@@ -59,7 +59,46 @@ export interface LiveStatus {
 }
 
 /**
- * Keeps `projectQuery(projectId)` fresh for one environment until the returned function is called.
+ * The query a screen shows for a project, observed while the environment is watched: observing keeps
+ * it active (so invalidations refetch it), lets it poll, and reports which deployments it shows, so
+ * their status pushes can refetch it too. The project page watches `projectQuery`; the overview
+ * watches its own.
+ */
+export type LiveTarget = (
+  queryClient: QueryClient,
+  environmentId: string,
+  onDeployments: (ids: string[]) => void,
+) => { setPolling: (intervalMs: number | false) => void; stop: () => void };
+
+/** A `LiveTarget` for `query`, given how to find an environment's deployments in its data. */
+export function liveTarget<TData, TKey extends QueryKey>(
+  query: QueryObserverOptions<TData, Error, TData, TData, TKey>,
+  deploymentIds: (data: TData, environmentId: string) => string[],
+): LiveTarget {
+  return (queryClient, environmentId, onDeployments) => {
+    const observer = new QueryObserver(queryClient, query);
+    const report = (data: TData | undefined) =>
+      onDeployments(data === undefined ? [] : deploymentIds(data, environmentId));
+    const unsubscribe = observer.subscribe((result) => report(result.data));
+    report(observer.getCurrentResult().data);
+    return {
+      setPolling: (intervalMs) => observer.setOptions({ ...query, refetchInterval: intervalMs }),
+      stop: unsubscribe,
+    };
+  };
+}
+
+export const projectTarget = (projectId: string) =>
+  liveTarget(
+    projectQuery(projectId),
+    (data: Project, environmentId) =>
+      data.environments
+        .find((e) => e.id === environmentId)
+        ?.services.flatMap((s) => (s.deployment ? [s.deployment.id] : [])) ?? [],
+  );
+
+/**
+ * Keeps a project's queries fresh for one environment until the returned function is called.
  * We only use subscriptions to trigger refetches, not yet as basically event sourcing
  *
  * - `canvasInvalidation` catches changes made anywhere (dashboard, CLI, git push).
@@ -71,48 +110,22 @@ export function keepEnvironmentLive(
   queryClient: QueryClient,
   projectId: string,
   environmentId: string,
+  target: LiveTarget,
   onStatus: (status: LiveStatus) => void,
 ): () => void {
-  const query = projectQuery(projectId);
-
   let refetchTimer: ReturnType<typeof setTimeout> | undefined;
   const scheduleRefetch = () => {
     clearTimeout(refetchTimer);
     refetchTimer = setTimeout(() => {
-      void queryClient.invalidateQueries({ queryKey: query.queryKey });
+      // Every query about the project is keyed under `projectQuery`'s key (the overview's too), so
+      // a change refetches whichever of them is on screen.
+      void queryClient.invalidateQueries({ queryKey: projectQuery(projectId).queryKey });
     }, REFETCH_DEBOUNCE_MS);
   };
 
-  // Observing the project keeps it active (so invalidations refetch it), lets it poll, and tells us
-  // which deployments are currently shown.
-  const project = new QueryObserver(queryClient, query);
-
-  let canvasAvailable = true;
-  let status: LiveStatus | undefined;
-  const updateStatus = () => {
-    const connection = getLiveConnection();
-    const mode: LiveMode = canvasAvailable && connection === "connected" ? "live" : "polling";
-    if (status?.mode === mode && status.connection === connection) return;
-    if (status?.mode !== mode) {
-      project.setOptions({
-        ...query,
-        refetchInterval: mode === "polling" ? POLL_INTERVAL_MS : false,
-      });
-    }
-    status = { mode, connection };
-    onStatus(status);
-  };
-  const setCanvasAvailable = (available: boolean) => {
-    canvasAvailable = available;
-    updateStatus();
-  };
-
   const deployments = new Map<string, () => void>();
-  const syncDeployments = (data: Project | undefined) => {
-    const environment = data?.environments.find((e) => e.id === environmentId);
-    const ids = new Set(
-      environment?.services.flatMap((s) => (s.deployment ? [s.deployment.id] : [])),
-    );
+  const syncDeployments = (shown: string[]) => {
+    const ids = new Set(shown);
     for (const [id, unsubscribe] of deployments) {
       if (ids.has(id)) continue;
       unsubscribe();
@@ -125,6 +138,24 @@ export function keepEnvironmentLive(
         subscribe(DeploymentStatusSubscription, { id }, { next: scheduleRefetch, error: () => {} }),
       );
     }
+  };
+  const observed = target(queryClient, environmentId, syncDeployments);
+
+  let canvasAvailable = true;
+  let status: LiveStatus | undefined;
+  const updateStatus = () => {
+    const connection = getLiveConnection();
+    const mode: LiveMode = canvasAvailable && connection === "connected" ? "live" : "polling";
+    if (status?.mode === mode && status.connection === connection) return;
+    if (status?.mode !== mode) {
+      observed.setPolling(mode === "polling" ? POLL_INTERVAL_MS : false);
+    }
+    status = { mode, connection };
+    onStatus(status);
+  };
+  const setCanvasAvailable = (available: boolean) => {
+    canvasAvailable = available;
+    updateStatus();
   };
 
   let lastHash: string | undefined;
@@ -157,8 +188,6 @@ export function keepEnvironmentLive(
     },
   );
 
-  const unsubscribeProject = project.subscribe((result) => syncDeployments(result.data));
-  syncDeployments(project.getCurrentResult().data);
   const unsubscribeConnection = onLiveConnectionChange(updateStatus);
   // Events may have been missed while disconnected.
   const unsubscribeReconnected = onReconnected(scheduleRefetch);
@@ -169,7 +198,7 @@ export function keepEnvironmentLive(
     clearInterval(watchdog);
     unsubscribeCanvas();
     for (const unsubscribe of deployments.values()) unsubscribe();
-    unsubscribeProject();
+    observed.stop();
     unsubscribeConnection();
     unsubscribeReconnected();
   };

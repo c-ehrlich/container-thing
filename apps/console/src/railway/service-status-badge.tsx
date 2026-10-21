@@ -27,18 +27,28 @@ export function ServiceStatusBadge(props: { deployment: Deployment | null }) {
       {state.kind === "sleeping" && <MoonIcon data-icon="inline-start" />}
       {state.kind === "stopped" && <SquareIcon data-icon="inline-start" />}
       {state.label}
-      {state.kind === "pending" && deployment && <Elapsed since={deployment.createdAt} />}
+      {state.kind === "pending" && deployment && <Elapsed since={pendingSince(deployment)} />}
     </Badge>
   );
+}
+
+/**
+ * When the current wait began. A deploy counts from its creation, across all its steps. A
+ * deployment being removed was created when it was deployed, maybe hours ago, so stopping counts
+ * from its last status change instead, or not at all if Railway didn't say.
+ */
+function pendingSince(deployment: Deployment): string | undefined {
+  if (deployment.status !== "REMOVING") return deployment.createdAt;
+  return deployment.statusUpdatedAt ?? undefined;
 }
 
 /**
  * Railway pushes deploy progress in bursts (nothing for ~14 s, then several steps at once), so the
  * elapsed time ticks locally instead of waiting for events.
  */
-function Elapsed(props: { since: string }) {
+function Elapsed(props: { since: string | undefined }) {
   const now = useNow();
-  if (now === null) return null;
+  if (now === null || props.since === undefined) return null;
   return (
     <span className="tabular-nums">
       {Math.max(0, Math.round((now - Date.parse(props.since)) / 1000))}s

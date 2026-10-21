@@ -29,6 +29,7 @@ const ProjectQuery = graphql(`
                     id
                     status
                     createdAt
+                    statusUpdatedAt
                   }
                 }
               }
@@ -118,6 +119,30 @@ export async function stopService(
   return { ...target, alreadyStopped: false };
 }
 
+const RestartMutation = graphql(`
+  mutation Restart($id: String!) {
+    deploymentRestart(id: $id)
+  }
+`);
+
+const RollbackMutation = graphql(`
+  mutation Rollback($id: String!) {
+    deploymentRollback(id: $id)
+  }
+`);
+
+const CancelMutation = graphql(`
+  mutation Cancel($id: String!) {
+    deploymentCancel(id: $id)
+  }
+`);
+
+const RemoveServiceMutation = graphql(`
+  mutation RemoveService($id: String!, $environmentId: String!) {
+    serviceDelete(id: $id, environmentId: $environmentId)
+  }
+`);
+
 const CreateServiceMutation = graphql(`
   mutation CreateService($input: ServiceCreateInput!) {
     serviceCreate(input: $input) {
@@ -183,4 +208,44 @@ export const projectQuery = (projectId: string) =>
   queryOptions({
     queryKey: ["project", projectId],
     queryFn: () => getProjectFn({ data: { projectId } }),
+  });
+
+const DeploymentId = z.object({ deploymentId: z.string() });
+
+/** Restarts a deployment's container as it is, without building again. */
+export const restartDeploymentFn = createServerFn({ method: "POST" })
+  .middleware([requireRailway])
+  .validator(DeploymentId)
+  .handler(async ({ data, context }) => {
+    await context.railway(RestartMutation, { id: data.deploymentId });
+  });
+
+/** Deploys an earlier deployment's image again, replacing what's running. */
+export const rollbackDeploymentFn = createServerFn({ method: "POST" })
+  .middleware([requireRailway])
+  .validator(DeploymentId)
+  .handler(async ({ data, context }) => {
+    await context.railway(RollbackMutation, { id: data.deploymentId });
+  });
+
+/** Stops a deployment that is still building or deploying. */
+export const cancelDeploymentFn = createServerFn({ method: "POST" })
+  .middleware([requireRailway])
+  .validator(DeploymentId)
+  .handler(async ({ data, context }) => {
+    await context.railway(CancelMutation, { id: data.deploymentId });
+  });
+
+/**
+ * Deletes a service from one environment, with its variables and settings there. Other environments
+ * keep theirs; Railway deletes the service itself once no environment has it.
+ */
+export const removeServiceFn = createServerFn({ method: "POST" })
+  .middleware([requireRailway])
+  .validator(z.object({ serviceId: z.string(), environmentId: z.string() }))
+  .handler(async ({ data, context }) => {
+    await context.railway(RemoveServiceMutation, {
+      id: data.serviceId,
+      environmentId: data.environmentId,
+    });
   });

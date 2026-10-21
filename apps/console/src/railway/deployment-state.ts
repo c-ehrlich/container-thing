@@ -6,7 +6,7 @@ export type DeploymentState = {
 };
 
 /** What a service's latest deployment means for the user: is it up, idle, on its way, broken or off? */
-export function deploymentState(deployment: Deployment | null): DeploymentState {
+export function deploymentState(deployment: Pick<Deployment, "status"> | null): DeploymentState {
   switch (deployment?.status) {
     case undefined:
     case "REMOVED":

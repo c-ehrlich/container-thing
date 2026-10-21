@@ -8,9 +8,11 @@ import {
 } from "@repo/ui/primitives/breadcrumb";
 import { Button } from "@repo/ui/primitives/button";
 import { useSidebar } from "@repo/ui/primitives/sidebar";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useMatch } from "@tanstack/react-router";
 import { PanelLeftCloseIcon, PanelLeftOpenIcon, SparklesIcon } from "lucide-react";
 
+import { projectOverviewQuery } from "../railway/overview";
 import type { Viewer } from "../railway/viewer";
 import { ShortcutTooltip } from "./shortcut-tooltip";
 
@@ -21,9 +23,21 @@ import { ShortcutTooltip } from "./shortcut-tooltip";
 export function AppHeader(props: { viewer: Viewer; chatOpen: boolean; onOpenChat: () => void }) {
   const { viewer, chatOpen, onOpenChat } = props;
   const match = useMatch({ from: "/projects/$projectId", shouldThrow: false });
+  const serviceMatch = useMatch({
+    from: "/projects/$projectId/services/$serviceId",
+    shouldThrow: false,
+  });
   const project = viewer.workspaces
     .flatMap((workspace) => workspace.projects)
     .find((p) => p.id === match?.params.projectId);
+  // Already loaded by the project's pages, so this reads the cache.
+  const { data: overview } = useQuery({
+    ...projectOverviewQuery(match?.params.projectId ?? ""),
+    enabled: serviceMatch !== undefined,
+  });
+  const service = overview?.environments
+    .flatMap((e) => e.services)
+    .find((s) => s.id === serviceMatch?.params.serviceId);
 
   return (
     <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
@@ -37,8 +51,30 @@ export function AppHeader(props: { viewer: Viewer; chatOpen: boolean; onOpenChat
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage>{project.name}</BreadcrumbPage>
+                {serviceMatch ? (
+                  <BreadcrumbLink
+                    render={
+                      <Link
+                        to="/projects/$projectId"
+                        params={{ projectId: project.id }}
+                        search={{ environmentId: serviceMatch.search.environmentId }}
+                      />
+                    }
+                  >
+                    {project.name}
+                  </BreadcrumbLink>
+                ) : (
+                  <BreadcrumbPage>{project.name}</BreadcrumbPage>
+                )}
               </BreadcrumbItem>
+              {serviceMatch && (
+                <>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{service?.name ?? "Service"}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </>
+              )}
             </>
           ) : (
             <BreadcrumbItem>
