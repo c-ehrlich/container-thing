@@ -17,7 +17,6 @@ function Home() {
   if (!viewer) {
     return (
       <main className="grid min-h-svh place-content-center gap-4 text-center">
-        <h1 className="text-4xl font-semibold tracking-tight">Console</h1>
         <a href="/auth/login" className={buttonVariants()}>
           Login with Railway
         </a>
