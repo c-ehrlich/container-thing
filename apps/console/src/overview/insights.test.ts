@@ -51,6 +51,8 @@ function project(history: Record<string, [Status, number, string?][]>): ProjectO
                   status: latest.status,
                   createdAt: latest.createdAt,
                   statusUpdatedAt: latest.createdAt,
+                  commitMessage: latest.commitMessage,
+                  creator: latest.creator,
                 }
               : null,
             hasEverDeployed: latest !== undefined,

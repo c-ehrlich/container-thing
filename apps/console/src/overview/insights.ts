@@ -120,6 +120,13 @@ function railwayUrl(project: ProjectOverview, service: ServiceWithState, deploym
   return url.toString();
 }
 
+/** The service's recent deploys in its environment, newest first. */
+function historyOf(project: ProjectOverview, service: ServiceWithState) {
+  return project.deployments
+    .filter((d) => d.serviceId === service.id && d.environmentId === service.environment.id)
+    .toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+}
+
 const isFailure = (d: OverviewDeployment) => d.status === "FAILED" || d.status === "CRASHED";
 
 function serviceInsights(project: ProjectOverview, service: ServiceWithState, now: number) {
@@ -129,9 +136,7 @@ function serviceInsights(project: ProjectOverview, service: ServiceWithState, no
 }
 
 function failureInsight(project: ProjectOverview, service: ServiceWithState, now: number): Insight {
-  const history = project.deployments
-    .filter((d) => d.serviceId === service.id && d.environmentId === service.environment.id)
-    .toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const history = historyOf(project, service);
   const streakEnd = history.findIndex((d) => !isFailure(d));
   const failures = streakEnd === -1 ? history : history.slice(0, streakEnd);
   const latest = failures[0];
@@ -298,11 +303,7 @@ function housekeeping(project: ProjectOverview, service: ServiceWithState, now: 
   }
   // A stopped service has no latest deployment once Railway removed them all, so the history says
   // when it last ran.
-  const last =
-    service.deployment ??
-    project.deployments
-      .filter((d) => d.serviceId === service.id && d.environmentId === service.environment.id)
-      .toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+  const last = service.deployment ?? historyOf(project, service)[0];
   if (service.state.kind === "stopped" && last && now - Date.parse(last.createdAt) > 7 * DAY) {
     return [
       {

@@ -99,7 +99,6 @@ export function TopologyDiagram(props: {
             details={
               <ServiceDetails
                 node={node}
-                project={project}
                 usage={props.usage?.services[serviceUsageKey(environment.id, node.id)]}
               />
             }
@@ -147,13 +146,9 @@ function EmptyEnvironment(props: { environment: OverviewEnvironment }) {
 }
 
 /** What a service is doing, shown above it while hovered. */
-function ServiceDetails(props: {
-  node: Node;
-  project: ProjectOverview;
-  usage?: ProjectUsage["services"][string];
-}) {
+function ServiceDetails(props: { node: Node; usage?: ProjectUsage["services"][string] }) {
   const { node, usage } = props;
-  const deployment = props.project.deployments.find((d) => d.id === node.deployment?.id);
+  const { deployment } = node;
   const cpu = usage?.cpu.at(-1);
   const memory = usage?.memoryGb.at(-1);
   return (

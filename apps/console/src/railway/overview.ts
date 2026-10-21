@@ -49,6 +49,10 @@ const ProjectOverviewQuery = graphql(`
                     status
                     createdAt
                     statusUpdatedAt
+                    meta
+                    creator {
+                      name
+                    }
                   }
                   hasEverDeployed
                 }
@@ -90,15 +94,25 @@ export async function fetchProjectOverview(railway: RailwayClient, projectId: st
   const { project, deployments } = await railway(ProjectOverviewQuery, { id: projectId });
 
   const environments = project.environments.edges.map(({ node: environment }) => {
-    const services = environment.serviceInstances.edges.map(({ node: instance }) => ({
-      id: instance.serviceId,
-      name: instance.serviceName,
-      source: sourceOf(instance.source),
-      domains: domainsOf(instance.domains),
-      // Null once every deployment is removed (a stopped service) as well as before the first one.
-      deployment: instance.latestDeployment,
-      hasEverDeployed: instance.hasEverDeployed,
-    }));
+    const services = environment.serviceInstances.edges.map(({ node: instance }) => {
+      const latest = instance.latestDeployment;
+      return {
+        id: instance.serviceId,
+        name: instance.serviceName,
+        source: sourceOf(instance.source),
+        domains: domainsOf(instance.domains),
+        // Null once every deployment is removed (a stopped service) as well as before the first one.
+        deployment: latest && {
+          id: latest.id,
+          status: latest.status,
+          createdAt: latest.createdAt,
+          statusUpdatedAt: latest.statusUpdatedAt,
+          commitMessage: deploymentMeta(latest.meta).commitMessage,
+          creator: latest.creator?.name ?? null,
+        },
+        hasEverDeployed: instance.hasEverDeployed,
+      };
+    });
 
     // `from` reads a variable that references `to`, so `from` depends on `to`.
     const links = new Map<string, [from: string, to: string]>();
