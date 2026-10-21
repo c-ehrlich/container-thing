@@ -50,9 +50,14 @@ export async function readSession(): Promise<Session | null> {
  * (the WebSocket upgrade in `live-socket.ts`).
  */
 export async function readSessionFromRequest(request: Request): Promise<Session | null> {
+  return decryptSession(getRequestCookie(request, SESSION_COOKIE));
+}
+
+/** `getCookie` for code that runs outside TanStack Start's request context. */
+export function getRequestCookie(request: Request, name: string): string | undefined {
   const cookies = request.headers.get("cookie")?.split(/;\s*/) ?? [];
-  const cookie = cookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`));
-  return decryptSession(cookie && decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1)));
+  const cookie = cookies.find((c) => c.startsWith(`${name}=`));
+  return cookie && decodeURIComponent(cookie.slice(name.length + 1));
 }
 
 async function decryptSession(token: string | undefined): Promise<Session | null> {

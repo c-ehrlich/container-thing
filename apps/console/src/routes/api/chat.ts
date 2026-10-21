@@ -12,8 +12,7 @@ import { z } from "zod";
 
 import { createChatTools } from "../../chat/tools";
 import type { ChatMessage } from "../../chat/tools";
-import { createRailwayClient } from "../../railway/railway-api";
-import { getFreshSession } from "../../railway/railway-oauth";
+import { getRailway } from "../../railway/backend";
 import { env } from "../../server/env";
 
 const ChatRequest = z.object({
@@ -50,13 +49,13 @@ export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const session = await getFreshSession();
-        if (!session) return new Response("Not signed in", { status: 401 });
+        const railway = await getRailway();
+        if (!railway) return new Response("Not signed in", { status: 401 });
 
         const body = ChatRequest.safeParse(await request.json().catch(() => null));
         if (!body.success) return new Response("Invalid request", { status: 400 });
 
-        const tools = createChatTools(createRailwayClient(session.accessToken));
+        const tools = createChatTools(railway);
         const messages = await validateUIMessages<ChatMessage>({
           messages: body.data.messages,
           tools,

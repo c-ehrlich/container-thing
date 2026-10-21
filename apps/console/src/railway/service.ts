@@ -159,19 +159,27 @@ const getServiceFn = createServerFn({ method: "GET" })
   .validator(ServiceInput)
   .handler(({ data, context }) => fetchService(context.railway, data));
 
+/** The newest lines of one deployment's build or runtime logs. */
+export async function fetchLogs(
+  railway: RailwayClient,
+  input: { deploymentId: string; kind: LogKind },
+) {
+  if (input.kind === "build") {
+    const { buildLogs } = await railway(BuildLogsQuery, { deploymentId: input.deploymentId });
+    return buildLogs;
+  }
+  const { deploymentLogs } = await railway(DeploymentLogsQuery, {
+    deploymentId: input.deploymentId,
+  });
+  return deploymentLogs;
+}
+
+export type LogLine = Awaited<ReturnType<typeof fetchLogs>>[number];
+
 const getLogsFn = createServerFn({ method: "GET" })
   .middleware([requireRailway])
   .validator(z.object({ deploymentId: z.string(), kind: z.enum(["deploy", "build"]) }))
-  .handler(async ({ data, context }) => {
-    if (data.kind === "build") {
-      const { buildLogs } = await context.railway(BuildLogsQuery, data);
-      return buildLogs;
-    }
-    const { deploymentLogs } = await context.railway(DeploymentLogsQuery, data);
-    return deploymentLogs;
-  });
-
-export type LogLine = Awaited<ReturnType<typeof getLogsFn>>[number];
+  .handler(({ data, context }) => fetchLogs(context.railway, data));
 
 /**
  * Keyed under the project, so Railway's live pushes for the project and the chat's refreshes reach

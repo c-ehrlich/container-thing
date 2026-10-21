@@ -30,7 +30,9 @@ import {
   TrainFrontIcon,
 } from "lucide-react";
 
+import type { Backend } from "../railway/backend";
 import type { Viewer } from "../railway/viewer";
+import { BackendMenu } from "./backend-menu";
 
 /**
  * Collapsing to icons shrinks the menu buttons to 32px squares, so the header and footer have fixed
@@ -51,8 +53,8 @@ const RESOURCES = [
   { label: "Central Station", href: "https://station.railway.com", icon: TrainFrontIcon },
 ];
 
-/** Left navigation: switch projects, jump between pages, and the signed-in user. */
-export function AppSidebar({ viewer }: { viewer: Viewer }) {
+/** Left navigation: switch projects, jump between pages, pick the data source, and the signed-in user. */
+export function AppSidebar({ viewer, backend }: { viewer: Viewer; backend: Backend }) {
   const match = useMatch({ from: "/projects/$projectId", shouldThrow: false });
   const home = useMatch({ from: "/", shouldThrow: false });
   const projectId = match?.params.projectId;
@@ -109,6 +111,9 @@ export function AppSidebar({ viewer }: { viewer: Viewer }) {
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
+        </SidebarGroup>
+        <SidebarGroup className="mt-auto">
+          <BackendMenu backend={backend} />
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className={FOOTER_HEIGHT}>

@@ -5,6 +5,8 @@ import { defineWebSocketHandler } from "nitro";
 import { z } from "zod";
 
 import { readSessionFromRequest } from "../../server/session";
+import { Backend, readBackendFromRequest } from "../backend";
+import { mockRailway } from "../mock-railway";
 
 /**
  * WebSocket relay between the browser and Railway, speaking `graphql-transport-ws` on both sides.
@@ -15,6 +17,8 @@ import { readSessionFromRequest } from "../../server/session";
  *   functions),
  * - opens one upstream connection per Railway endpoint with the token in `connection_init`,
  * - closes with 1012 shortly before the token expires; the client reconnects with a refreshed cookie.
+ *
+ * In mock mode (see `backend.ts`), subscriptions are answered by the mock instead of Railway.
  *
  * See docs/realtime.md.
  */
@@ -47,8 +51,21 @@ const ClientMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("complete"), id: z.string().min(1) }),
 ]);
 
+/** Where subscriptions go: a graphql-ws client for a Railway endpoint, or the mock. */
+interface Upstream {
+  subscribe: (
+    payload: { query: string; variables?: Record<string, unknown>; operationName?: string },
+    sink: {
+      next: (result: unknown) => void;
+      error: (error: unknown) => void;
+      complete: () => void;
+    },
+  ) => () => void;
+}
+
 interface Connection {
   accessToken: string;
+  backend: Backend;
   upstreams: Map<string, Client>;
   subscriptions: Map<string, () => void>;
   expiryTimer: ReturnType<typeof setTimeout>;
@@ -97,17 +114,19 @@ export default defineWebSocketHandler({
       context: {
         accessToken: session.accessToken,
         accessTokenExpiresAt: session.accessTokenExpiresAt,
+        backend: readBackendFromRequest(request),
       },
     };
   },
 
   open(peer) {
-    const { accessToken, accessTokenExpiresAt } = z
-      .object({ accessToken: z.string(), accessTokenExpiresAt: z.number() })
+    const { accessToken, accessTokenExpiresAt, backend } = z
+      .object({ accessToken: z.string(), accessTokenExpiresAt: z.number(), backend: Backend })
       .parse(peer.context);
     const expiresInMs = accessTokenExpiresAt - Date.now() - TOKEN_EXPIRY_MARGIN_MS;
     connections.set(peer.id, {
       accessToken,
+      backend,
       upstreams: new Map(),
       subscriptions: new Map(),
       expiryTimer: setTimeout(() => peer.close(CLOSE_RECONNECT, "Session expiring"), expiresInMs),
@@ -186,13 +205,16 @@ export default defineWebSocketHandler({
 });
 
 /**
- * The browser connection's graphql-ws client for a Railway endpoint, created on first use.
+ * The browser connection's graphql-ws client for a Railway endpoint, created on first use, or the
+ * mock.
  */
 function upstream(
   peer: { close: (code?: number, reason?: string) => void },
   connection: Connection,
   endpoint: string,
-): Client {
+): Upstream {
+  if (connection.backend === "mock") return mockRailway();
+
   const existing = connection.upstreams.get(endpoint);
   if (existing) {
     return existing;

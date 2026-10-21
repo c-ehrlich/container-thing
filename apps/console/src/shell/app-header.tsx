@@ -1,3 +1,4 @@
+import { Badge } from "@repo/ui/primitives/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,16 +13,22 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useMatch } from "@tanstack/react-router";
 import { PanelLeftCloseIcon, PanelLeftOpenIcon, SparklesIcon } from "lucide-react";
 
+import type { Backend } from "../railway/backend";
 import { projectOverviewQuery } from "../railway/overview";
 import type { Viewer } from "../railway/viewer";
 import { ShortcutTooltip } from "./shortcut-tooltip";
 
 /**
- * Top bar: sidebar toggle, where you are, and, while the assistant is closed, the button that
- * opens it. Once open, the assistant closes from its own header.
+ * Top bar: sidebar toggle, where you are, whether this is mock data, and, while the assistant is
+ * closed, the button that opens it. Once open, the assistant closes from its own header.
  */
-export function AppHeader(props: { viewer: Viewer; chatOpen: boolean; onOpenChat: () => void }) {
-  const { viewer, chatOpen, onOpenChat } = props;
+export function AppHeader(props: {
+  viewer: Viewer;
+  backend: Backend;
+  chatOpen: boolean;
+  onOpenChat: () => void;
+}) {
+  const { viewer, backend, chatOpen, onOpenChat } = props;
   const match = useMatch({ from: "/projects/$projectId", shouldThrow: false });
   const serviceMatch = useMatch({
     from: "/projects/$projectId/services/$serviceId",
@@ -83,14 +90,17 @@ export function AppHeader(props: { viewer: Viewer; chatOpen: boolean; onOpenChat
           )}
         </BreadcrumbList>
       </Breadcrumb>
-      {!chatOpen && (
-        <ShortcutTooltip label="Open assistant" shortcut="⌘I">
-          <Button variant="outline" size="sm" className="ml-auto" onClick={onOpenChat}>
-            <SparklesIcon />
-            Assistant
-          </Button>
-        </ShortcutTooltip>
-      )}
+      <div className="ml-auto flex items-center gap-2">
+        {backend === "mock" && <Badge variant="outline">Mock data</Badge>}
+        {!chatOpen && (
+          <ShortcutTooltip label="Open assistant" shortcut="⌘I">
+            <Button variant="outline" size="sm" onClick={onOpenChat}>
+              <SparklesIcon />
+              Assistant
+            </Button>
+          </ShortcutTooltip>
+        )}
+      </div>
     </header>
   );
 }
