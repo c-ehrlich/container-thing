@@ -1,12 +1,4 @@
 import { Badge } from "@repo/ui/primitives/badge";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@repo/ui/primitives/breadcrumb";
 import { Button, buttonVariants } from "@repo/ui/primitives/button";
 import {
   Card,
@@ -61,19 +53,8 @@ function ProjectPage() {
   const live = useWatchEnvironment(projectId, environment?.id);
 
   return (
-    <main className="mx-auto grid max-w-2xl gap-6 p-8">
+    <div className="mx-auto grid w-full max-w-2xl gap-6 p-8">
       <header className="grid gap-2">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink render={<Link to="/" />}>Projects</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{project.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
           <Badge variant="outline" title={`Connection: ${live?.connection ?? "connecting"}`}>
@@ -129,7 +110,7 @@ function ProjectPage() {
           </CardContent>
         </Card>
       )}
-    </main>
+    </div>
   );
 }
 

@@ -28,3 +28,5 @@ export async function fetchViewer(railway: RailwayClient) {
   const { me, externalWorkspaces } = await railway(ViewerQuery);
   return { user: me, workspaces: externalWorkspaces };
 }
+
+export type Viewer = Awaited<ReturnType<typeof fetchViewer>>;
