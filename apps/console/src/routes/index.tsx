@@ -12,7 +12,7 @@ import { getDismissedFn, useDismissed } from "../domains/insights/dismissed";
 import { healthOf, timeAgo } from "../domains/insights/health";
 import { FAILURE_RULES, insightsFor } from "../domains/insights/insights";
 import type { Insight } from "../domains/insights/insights";
-import { useWatchEnvironments } from "../domains/live/watch-environment";
+import { useWatchEnvironments } from "../domains/live";
 import { projectOverviewQuery, projectUsageQuery } from "../domains/project/overview";
 import type { ProjectOverview, ProjectUsage } from "../domains/project/overview";
 import type { Viewer } from "../domains/project/viewer";

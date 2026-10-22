@@ -14,7 +14,7 @@ import { Link } from "@tanstack/react-router";
 import { CircleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { useWatchEnvironments } from "../../domains/live/watch-environment";
+import { useWatchEnvironments } from "../../domains/live";
 import { projectOverviewQuery } from "../../domains/project/overview";
 import type { OverviewService } from "../../domains/project/overview";
 import { ServiceStatusBadge } from "../service-status-badge";

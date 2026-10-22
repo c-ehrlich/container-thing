@@ -3,7 +3,7 @@ import { Outlet, createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { getDismissedFn } from "../../../domains/insights/dismissed";
-import { useWatchEnvironments } from "../../../domains/live/watch-environment";
+import { useWatchEnvironments } from "../../../domains/live";
 import { projectOverviewQuery } from "../../../domains/project/overview";
 
 /**

@@ -3,12 +3,12 @@ import { Input } from "@repo/ui/primitives/input";
 import { Spinner } from "@repo/ui/primitives/spinner";
 import { StatusDot } from "@repo/ui/primitives/status-dot";
 import { ToggleGroup, ToggleGroupItem } from "@repo/ui/primitives/toggle-group";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { SearchIcon } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
-import { subscribe } from "../../domains/live/live-client";
-import { DeploymentLogsSubscription, logsQuery } from "../../domains/project/service";
+import { useDeploymentLogStream } from "../../domains/live";
+import { logsQuery } from "../../domains/project/service";
 import type { LogKind, LogLine } from "../../domains/project/service";
 
 /**
@@ -30,7 +30,7 @@ export function LogViewer(props: {
   const query = logsQuery(deploymentId, kind);
   const { data: lines = [], isPending, error } = useQuery(query);
   const streaming = props.live && kind === "deploy";
-  useStreamLogs(deploymentId, streaming);
+  useDeploymentLogStream(deploymentId, streaming);
 
   const needle = filter.trim().toLowerCase();
   const shown = needle ? lines.filter((l) => l.message.toLowerCase().includes(needle)) : lines;
@@ -146,32 +146,4 @@ function formatTime(timestamp: string) {
   return date.toDateString() === new Date().toDateString()
     ? time
     : `${date.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
-}
-
-/**
- * Appends lines pushed by Railway's `deploymentLogs` subscription to the cached logs. Railway can
- * resend recent lines on subscribe, so lines already shown are skipped.
- */
-function useStreamLogs(deploymentId: string, enabled: boolean) {
-  const queryClient = useQueryClient();
-  useEffect(() => {
-    if (!enabled) return undefined;
-    const { queryKey } = logsQuery(deploymentId, "deploy");
-    return subscribe(
-      DeploymentLogsSubscription,
-      { deploymentId },
-      {
-        next: ({ deploymentLogs }) => {
-          queryClient.setQueryData(queryKey, (current = []) => {
-            const seen = new Set(current.map((l) => `${l.timestamp}${l.message}`));
-            const fresh = deploymentLogs.filter((l) => !seen.has(`${l.timestamp}${l.message}`));
-            return fresh.length === 0
-              ? current
-              : [...current, ...fresh].toSorted((a, b) => a.timestamp.localeCompare(b.timestamp));
-          });
-        },
-        error: () => {},
-      },
-    );
-  }, [deploymentId, enabled, queryClient]);
 }

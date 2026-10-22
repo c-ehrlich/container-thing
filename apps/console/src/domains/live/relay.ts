@@ -75,7 +75,7 @@ interface Connection {
 const connections = new Map<string, Connection>();
 
 /** The Railway endpoint for a subscription document, or an error message if it isn't one. */
-function endpointFor(query: string): { endpoint: string } | { error: string } {
+export function endpointFor(query: string): { endpoint: string } | { error: string } {
   let document;
   try {
     document = parse(query);

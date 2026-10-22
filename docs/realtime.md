@@ -53,7 +53,7 @@ connection. Public subscriptions don't (`environmentLogs` ran 240 s; `deployment
 Before we handled this, tabs silently stopped noticing outside changes after 95 s while still showing
 "Live": stops kept syncing via `deployment(id)`, starts (only visible through the hash) didn't. So:
 
-- `subscribeRaw` resubscribes when the server completes a subscription (with a back-off if one keeps
+- `keepSubscribed` (`domains/live/transport.ts`) resubscribes when the server completes a subscription (with a back-off if one keeps
   completing within 10 s).
 - A watchdog treats 30 s without a hash (normally re-sent every ≤ 8 s) as "🐉 down" and polls until
   pushes resume.

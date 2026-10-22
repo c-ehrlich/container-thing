@@ -132,20 +132,6 @@ const BuildLogsQuery = graphql(`
   }
 `);
 
-/**
- * New runtime log lines of one deployment, pushed as they're written. Railway may resend recent lines
- * when subscribing, so callers dedupe.
- */
-export const DeploymentLogsSubscription = graphql(`
-  subscription DeploymentLogsStream($deploymentId: String!) {
-    deploymentLogs(deploymentId: $deploymentId, limit: 100) {
-      timestamp
-      severity
-      message
-    }
-  }
-`);
-
 export type LogKind = "deploy" | "build";
 
 const ServiceInput = z.object({
