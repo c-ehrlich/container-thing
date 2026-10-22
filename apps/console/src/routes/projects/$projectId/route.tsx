@@ -2,9 +2,9 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Outlet, createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { getDismissedFn } from "../../../overview/dismissed";
-import { useWatchOverview } from "../../../railway/live/watch-environment";
-import { projectOverviewQuery } from "../../../railway/overview";
+import { getDismissedFn } from "../../../domains/insights/dismissed";
+import { useWatchEnvironments } from "../../../domains/live/watch-environment";
+import { projectOverviewQuery } from "../../../domains/project/overview";
 
 /**
  * A project and its services. Both the project page and a service's page read the project's
@@ -22,6 +22,6 @@ export const Route = createFileRoute("/projects/$projectId")({
 function ProjectLayout() {
   const { projectId } = Route.useParams();
   const { data: project } = useSuspenseQuery(projectOverviewQuery(projectId));
-  useWatchOverview([{ projectId, environmentIds: project.environments.map((e) => e.id) }]);
+  useWatchEnvironments([{ projectId, environmentIds: project.environments.map((e) => e.id) }]);
   return <Outlet />;
 }

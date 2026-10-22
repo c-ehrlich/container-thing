@@ -3,16 +3,18 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { ArrowUpRightIcon, CircleCheckIcon } from "lucide-react";
 
-import { AddServiceDialog } from "../../../add-service/add-service-dialog";
-import { useDismissed } from "../../../overview/dismissed";
-import { DotGrid } from "../../../overview/dot-grid";
-import { KIND_DOT, healthOf, primaryEnvironment, verdictOf } from "../../../overview/health";
-import { insightsFor } from "../../../overview/insights";
-import { InsightItem } from "../../../overview/insights-panel";
-import { MonthlyCost } from "../../../overview/monthly-cost";
-import { TopologyDiagram } from "../../../overview/topology-diagram";
-import { ServiceTable } from "../../../project/service-table";
-import { projectOverviewQuery, projectUsageQuery } from "../../../railway/overview";
+import { AddServiceDialog } from "../../../components/add-service/add-service-dialog";
+import { DotGrid } from "../../../components/overview/dot-grid";
+import { InsightItem } from "../../../components/overview/insights-panel";
+import { MonthlyCost } from "../../../components/overview/monthly-cost";
+import { TopologyDiagram } from "../../../components/overview/topology-diagram";
+import { ServiceTable } from "../../../components/project/service-table";
+import { KIND_DOT } from "../../../components/status-colors";
+import { useDismissed } from "../../../domains/insights/dismissed";
+import { healthOf, verdictOf } from "../../../domains/insights/health";
+import { insightsFor } from "../../../domains/insights/insights";
+import { pickEnvironment } from "../../../domains/project/environments";
+import { projectOverviewQuery, projectUsageQuery } from "../../../domains/project/overview";
 
 export const Route = createFileRoute("/projects/$projectId/")({
   component: ProjectPage,
@@ -34,8 +36,7 @@ function ProjectPage() {
   const { data: usage } = useQuery(projectUsageQuery(projectId));
   const dismissed = useDismissed(initiallyDismissed);
 
-  const environment =
-    project.environments.find((e) => e.id === environmentId) ?? primaryEnvironment(project);
+  const environment = pickEnvironment(project, environmentId);
   const workspace = viewer?.workspaces.find((w) => w.projects.some((p) => p.id === projectId));
   const insights = insightsFor([{ project, usage }]);
   const shown = insights.filter(

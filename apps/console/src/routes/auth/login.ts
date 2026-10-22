@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { startLogin } from "../../railway/railway-oauth";
+import { startLogin } from "../../server/auth/oauth";
 
 /** Starts "Login with Railway" by redirecting to Railway's consent screen. */
 export const Route = createFileRoute("/auth/login")({

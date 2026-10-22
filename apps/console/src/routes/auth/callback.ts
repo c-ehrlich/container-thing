@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { finishLogin } from "../../railway/railway-oauth";
+import { finishLogin } from "../../server/auth/oauth";
 
 /** Railway redirects here after consent. */
 export const Route = createFileRoute("/auth/callback")({

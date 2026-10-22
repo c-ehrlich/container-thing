@@ -5,19 +5,21 @@ import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { GlobeIcon } from "lucide-react";
 import { useState } from "react";
 
-import { useDismissed } from "../../../../overview/dismissed";
-import { KIND_DOT, primaryEnvironment, timeAgo } from "../../../../overview/health";
-import { insightsFor } from "../../../../overview/insights";
-import { InsightItem } from "../../../../overview/insights-panel";
-import { deploymentState } from "../../../../railway/deployment-state";
-import { projectOverviewQuery } from "../../../../railway/overview";
-import type { ProjectOverview } from "../../../../railway/overview";
-import { serviceQuery } from "../../../../railway/service";
-import { ServiceStatusBadge } from "../../../../railway/service-status-badge";
-import { DeploymentList } from "../../../../service/deployment-list";
-import { LogViewer } from "../../../../service/log-viewer";
-import { MetricChart, formatCpu, formatMemory } from "../../../../service/metric-chart";
-import { ServiceActions } from "../../../../service/service-actions";
+import { InsightItem } from "../../../../components/overview/insights-panel";
+import { ServiceStatusBadge } from "../../../../components/service-status-badge";
+import { DeploymentList } from "../../../../components/service/deployment-list";
+import { LogViewer } from "../../../../components/service/log-viewer";
+import { MetricChart, formatCpu, formatMemory } from "../../../../components/service/metric-chart";
+import { ServiceActions } from "../../../../components/service/service-actions";
+import { KIND_DOT } from "../../../../components/status-colors";
+import { useDismissed } from "../../../../domains/insights/dismissed";
+import { timeAgo } from "../../../../domains/insights/health";
+import { insightsFor } from "../../../../domains/insights/insights";
+import { deploymentState } from "../../../../domains/project/deployment-state";
+import { primaryEnvironment } from "../../../../domains/project/environments";
+import { projectOverviewQuery } from "../../../../domains/project/overview";
+import type { ProjectOverview } from "../../../../domains/project/overview";
+import { serviceQuery } from "../../../../domains/project/service";
 
 /** The environment asked for, else the project's primary one if the service is in it, else the first that has it. */
 function environmentOf(project: ProjectOverview, serviceId: string, environmentId?: string) {

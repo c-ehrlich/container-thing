@@ -18,7 +18,7 @@ export default defineConfig({
     react(),
     nitro({
       features: { websocket: true },
-      handlers: [{ route: "/api/live", handler: "./src/railway/live/live-socket.ts" }],
+      handlers: [{ route: "/api/live", handler: "./src/domains/live/relay.ts" }],
     }),
   ],
 });
