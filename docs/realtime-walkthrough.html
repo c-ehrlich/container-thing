@@ -1557,8 +1557,8 @@
           <b class="b">Reading</b>
           <span
             >The page asks the server for the project (a <b>query</b>). TanStack Query keeps the
-            answer in a cache under the key <code>["project", projectId]</code>, and every component
-            reads from there.</span
+            answer in a cache entry under the key <code>projectScope(projectId)</code> (that is,
+            <code>["project", projectId]</code>), and every screen reads from there.</span
           >
         </div>
         <div class="row">
@@ -1611,7 +1611,9 @@
       <h2>Where the code lives</h2>
       <p class="lede">
         A project page, the plumbing to read and write through TanStack Query, and a live-update
-        layer. Click a file to see what it does and why.
+        layer in <code>domains/live/</code>: start at its <code>index.ts</code>, which lists what
+        the rest of the app may use and how the pieces fit. Click a file to see what it does and
+        why.
       </p>
       <div class="files" style="margin-top: 18px">
         <div class="filelist" id="filelist"></div>
@@ -1656,17 +1658,22 @@
           <h3 style="margin-top: 0">1. Describe the query once</h3>
           <p>
             <code>projectQuery(projectId)</code> bundles two things: a <b>key</b> (the name of the
-            cache entry) and a <b>function</b> that fetches the data. The loader, the page
-            component, the chat widgets, and the live watcher all pass the same object around, so
-            they all point at the same cache entry.
+            cache entry) and a <b>function</b> that fetches the data. The loader, the project page,
+            the overview, the chat widgets, and the live watcher all pass the same object around, so
+            they all point at the same cache entry. The key starts with
+            <code>projectScope(projectId)</code>, so invalidating that prefix refreshes every entry
+            about the project at once.
           </p>
           <pre
             class="code"
-            data-file="railway/project.ts"
-          >export const projectQuery = (projectId: string) =>
+            data-file="domains/project/project.ts"
+          >export const projectScope = (projectId: string) => ["project", projectId] as const;
+
+export const projectQuery = (projectId: string) =>
   queryOptions({
-    <mark>queryKey: ["project", projectId],</mark>
+    <mark>queryKey: [...projectScope(projectId), "project"],</mark>
     queryFn: () => getProjectFn({ data: { projectId } }),
+    staleTime: 30_000,
   });</pre>
         </div>
         <div>
@@ -1676,16 +1683,17 @@
             cache. The component then uses <code>useSuspenseQuery</code>, which reads that entry and
             keeps the component subscribed to it, so it re-renders whenever the entry changes.
           </p>
-          <pre class="code" data-file="routes/projects/$projectId.tsx">
+          <pre class="code" data-file="routes/projects/$projectId/route.tsx + index.tsx">
 export const Route = createFileRoute("/projects/$projectId")({
-  loader: ({ context, params }) =>
-    <mark>context.queryClient.ensureQueryData(projectQuery(params.projectId)),</mark>
-  component: ProjectPage,
+  loader: async ({ context, params }) => {
+    <mark>await context.queryClient.ensureQueryData(projectQuery(params.projectId));</mark>
+    return { dismissed: await getDismissedFn() };
+  },
+  component: ProjectLayout,
 });
 
 function ProjectPage() {
-  const query = projectQuery(projectId);
-  const { data: project } = <mark>useSuspenseQuery(query)</mark>;</pre>
+  const { data: project } = <mark>useSuspenseQuery(projectQuery(projectId))</mark>;</pre>
         </div>
       </div>
 
@@ -1695,15 +1703,16 @@ function ProjectPage() {
         runs on the server. When the browser calls it, TanStack Start sends an HTTP request to the
         server, runs the body there, and returns the result as JSON. Before the body runs, the
         <code>requireRailway</code> middleware reads the encrypted session cookie, refreshes the
-        token if needed, and hands the handler a ready-made Railway client.
+        token if needed, and hands the handler a ready-made Railway client (or the mock, if this
+        browser picked it in the sidebar).
       </p>
       <pre
         class="code"
-        data-file="railway/require-railway.ts + railway/project.ts"
+        data-file="server/railway/require-railway.ts + domains/project/project.ts"
       >export const requireRailway = createMiddleware({ type: "function" }).server(async ({ next }) => {
-  const session = await getFreshSession();
-  if (!session) { setResponseStatus(401); throw new Error("Not signed in to Railway"); }
-  return next({ context: { <mark>railway: createRailwayClient(session.accessToken)</mark> } });
+  const railway = <mark>await getRailway()</mark>;   // fresh session + real or mock backend
+  if (!railway) { setResponseStatus(401); throw new Error("Not signed in to Railway"); }
+  return next({ context: { railway } });
 });
 
 const getProjectFn = createServerFn({ method: "GET" })
@@ -1712,8 +1721,8 @@ const getProjectFn = createServerFn({ method: "GET" })
   .handler(({ data, context }) => <mark>fetchProject(context.railway, data.projectId)</mark>);
 
 export async function fetchProject(railway: RailwayClient, projectId: string) {
-  const { project } = await railway(ProjectQuery, { id: projectId });
-  return { /* flattened: environments → services → latest deployment */ };
+  const { project, deployments } = await railway(ProjectQuery, { id: projectId });
+  return { /* flattened: environments → services → latest deployment, links, recent deploys */ };
 }</pre>
 
       <h3>Step through it</h3>
@@ -1755,24 +1764,27 @@ export async function fetchProject(railway: RailwayClient, projectId: string) {
       <h3>Why two observers watch the same entry</h3>
       <p>
         <code>ProjectPage</code> reads the data with <code>useSuspenseQuery</code>.
-        <code>keepEnvironmentLive</code> isn't a React hook. It runs outside React, and creates its
-        own <code>QueryObserver</code> on the <em>same</em> key. That is what
-        <code>useQuery</code> uses under the hood. The observer does three jobs: it keeps the entry
-        active, so invalidating it refetches. It tells the watcher which deployments are on screen.
-        And it carries an option, <code>refetchInterval</code>, which turns polling on and off.
-        Options like that belong to each observer, while the data lives once in the cache. Both
-        observers share one entry, and one fetch updates both.
+        <code>keepEnvironmentLive</code> (in <code>domains/live/use-live.ts</code>) isn't a React
+        hook. It runs outside React, and creates its own <code>QueryObserver</code> on the
+        <em>same</em> key. That is what <code>useQuery</code> uses under the hood. The observer does
+        three jobs: it keeps the entry active, so invalidating it refetches. It tells the watcher
+        which deploys are in flight. And it carries an option, <code>refetchInterval</code>, which
+        turns polling on and off. Options like that belong to each observer, while the data lives
+        once in the cache. Both observers share one entry, and one fetch updates both.
       </p>
       <pre
         class="code"
-        data-file="railway/live/environment-live.ts"
-      >const project = <mark>new QueryObserver(queryClient, query)</mark>;
+        data-file="domains/live/use-live.ts"
+      >const observer = <mark>new QueryObserver(queryClient, query)</mark>;
 …
-const mode: LiveMode = canvasAvailable && connection === "connected" ? "live" : "polling";
-project.setOptions({
-  ...query,
-  <mark>refetchInterval: mode === "polling" ? POLL_INTERVAL_MS : false,</mark>
-});</pre>
+onStatus: ({ mode }) => {
+  if (polling === (mode === "polling")) return;
+  polling = mode === "polling";
+  observer.setOptions({
+    ...query,
+    <mark>refetchInterval: polling ? POLL_INTERVAL_MS : query.refetchInterval,</mark>
+  });
+},</pre>
     </section>
 
     <!-- ============================================================ POLL VS PUSH -->
@@ -1846,17 +1858,20 @@ project.setOptions({
         </div>
         <div class="card">
           <div class="eyebrow">Our client, in one call</div>
-          <pre class="code" data-file="railway/live/live-client.ts">client ??= createClient({
+          <pre
+            class="code"
+            data-file="domains/live/relay-client.ts"
+          >const client: Client = createClient({
   url: async () => { /* refresh session, then */ return "ws://…/api/live"; },
   <mark>lazy: true,</mark>                 // no socket until the first subscribe
   lazyCloseTimeout: 5_000,    // close 5 s after the last one ends
   <mark>retryAttempts: Number.POSITIVE_INFINITY,</mark>
   shouldRetry: (error) => !(error instanceof SignedOutError),
-  on: { connecting: …, connected: … },  // feeds the "Live" badge
+  on: { connecting: …, connected: … },  // feeds connection()
 });</pre>
           <p class="muted" style="font-size: 0.88rem; margin: 0">
-            One client for the whole app (the <code>??=</code> creates it once). Every subscription
-            on the page shares this one socket.
+            One client for the whole app: <code>relayTransport()</code> creates it once (with
+            <code>??=</code>). Every subscription on the page shares this one socket.
           </p>
         </div>
       </div>
@@ -1865,8 +1880,7 @@ project.setOptions({
         <div class="lab-head">
           <h3>Lab: be the browser</h3>
           <span class="muted" style="font-size: 0.85rem"
-            >you send frames; a simulated relay answers the way
-            <code>live-socket.ts</code> does</span
+            >you send frames; a simulated relay answers the way <code>relay.ts</code> does</span
           >
         </div>
         <div class="proto">
@@ -1931,7 +1945,7 @@ project.setOptions({
         <div class="lab-head">
           <h3>Lab: what will the relay let through?</h3>
           <span class="muted" style="font-size: 0.85rem"
-            ><code>endpointFor()</code> in <code>railway/live/live-socket.ts</code></span
+            ><code>endpointFor()</code> in <code>domains/live/relay.ts</code></span
           >
         </div>
         <p class="muted" style="margin-top: 6px">
@@ -1974,24 +1988,32 @@ project.setOptions({
         <div class="card">
           <h4 style="margin: 0 0 4px"><code>deployment(id)</code></h4>
           <p class="muted" style="font-size: 0.9rem">
-            Public API. One subscription per deployment currently on screen. It pushes
-            <code>SUCCESS</code>, <code>REMOVING</code>, and <code>REMOVED</code> (measured: not the
-            in-between states). It's a second, independent signal for the deployments you can
-            already see.
+            Public API. One subscription per deploy in flight on screen (deploying or stopping). It
+            pushes <code>SUCCESS</code>, <code>REMOVING</code>, and <code>REMOVED</code> (measured:
+            not the in-between states). It's a second, independent signal for the deploys you can
+            already see going.
           </p>
         </div>
       </div>
 
-      <pre class="code" data-file="railway/live/environment-live.ts">next: (data) => {
+      <pre class="code" data-file="domains/live/environment.ts">next: (data) => {
   const parsed = CanvasInvalidation.safeParse(data);   // hand-typed, so validate it
   if (!parsed.success) return failCanvas();
+  canvasFailed = false;
   lastPushAt = Date.now();                             // feeds the 30 s watchdog
   setCanvasAvailable(true);
   // Railway re-sends the same hash periodically; only a new one means something changed.
   <mark>if (parsed.data.canvasInvalidation.id === lastHash) return;</mark>
   lastHash = parsed.data.canvasInvalidation.id;
-  <mark>scheduleRefetch();</mark>                                  // debounced 250 ms → invalidateQueries
+  <mark>changed();</mark>                                          // debounced 250 ms → onChange
 },</pre>
+      <p class="muted" style="font-size: 0.9rem">
+        <code>watchEnvironment</code> knows nothing about React or TanStack Query: it only says
+        “something changed” through <code>onChange</code>. <code>use-live.ts</code> turns that into
+        <code>invalidateQueries({ queryKey: projectScope(projectId) })</code>. That split is what
+        lets <code>environment.test.ts</code> drive the engine with a fake transport and fake
+        timers: hash dedupe, debouncing, the watchdog, reconnects.
+      </p>
 
       <div class="lab">
         <div class="lab-head">
@@ -2052,7 +2074,7 @@ project.setOptions({
         <div class="card">
           <b>New deployments get subscribed after a refetch.</b>
           <p class="muted" style="font-size: 0.9rem; margin: 4px 0 0">
-            The deployments to subscribe to come from the data on screen. Start the worker:
+            The deploys to subscribe to come from the data on screen. Start the worker:
             <code>canvasInvalidation</code> notices first, the refetch reveals a new deployment ID,
             and only then does a <code>deployment(id)</code> subscription start for it.
           </p>
@@ -2069,7 +2091,8 @@ project.setOptions({
           <b>Silence is a failure too.</b>
           <p class="muted" style="font-size: 0.9rem; margin: 4px 0 0">
             A watchdog checks every 5 s. After 30 s without any hash (even a repeated one), the
-            badge flips to polling. Pushes resuming flips it back. Use 4× speed to watch it happen.
+            watch switches to polling. Pushes resuming switch it back. Use 4× speed to watch it
+            happen.
           </p>
         </div>
       </div>
@@ -2081,17 +2104,18 @@ project.setOptions({
       <h2>When it breaks</h2>
       <p class="lede">
         Live connections fail in more ways than requests do: they can drop, go quiet, or be ended by
-        the other side. The rule here is simple. The badge says <b>Live</b> only when both the
-        socket is connected and <code>canvasInvalidation</code> is healthy. Otherwise the page polls
-        every 30 s, so it's never stale for long.
+        the other side. The rule here is simple. A watch counts as <b>live</b> only when both the
+        socket is connected and <code>canvasInvalidation</code> is healthy. Otherwise the project's
+        query polls every 30 s, so it's never stale for long. (This mode is internal: it only
+        switches polling on and off, and the UI doesn't show it.)
       </p>
 
       <div class="lab">
-        <div class="lab-head"><h3>Lab: what does the badge say?</h3></div>
+        <div class="lab-head"><h3>Lab: live or polling?</h3></div>
         <div class="tt">
           <div>
             <div class="mini-label" style="margin-top: 0">
-              Connection (<code>getLiveConnection()</code>)
+              Connection (<code>transport.connection()</code>)
             </div>
             <div class="opts2" id="tt-conn"></div>
             <div class="mini-label">canvasInvalidation stream</div>
@@ -2115,27 +2139,26 @@ project.setOptions({
       <div class="eyebrow">Chapter 10</div>
       <h2>Small stores outside React</h2>
       <p class="lede">
-        Three pieces of state live in plain module variables instead of React state: the connection
-        status (one socket for the whole app), the environments being watched, and a shared
-        one-second clock. Plain code like <code>keepEnvironmentLive</code> reads the connection with
-        <code>getLiveConnection()</code> and <code>onLiveConnectionChange()</code>. React reads the
-        other two with <code>useSyncExternalStore</code>, which takes three functions.
+        Three pieces of state live outside React state: the connection status (inside the one relay
+        transport, for the whole app), the environments being watched (a counted map in
+        <code>use-live.ts</code>), and a shared one-second clock. The engine reads the connection
+        through its <code>LiveTransport</code>: <code>connection()</code> and
+        <code>onConnectionChange()</code>. React only reads the clock, with
+        <code>useSyncExternalStore</code>, which takes three functions.
       </p>
       <div class="grid g2" style="margin-top: 14px">
         <pre
           class="code"
-          data-file="railway/live/watch-environment.ts"
-        >const watches = new Map&lt;string, Watch>();   // one per environment, counted
-const listeners = new Set&lt;() => void>();
+          data-file="components/service-status-badge.tsx"
+        >/** A clock shared by every `Elapsed`, ticking once a second while any is mounted. */
+let clockNow = Date.now();
+const clockListeners = new Set&lt;() => void>();
 
-export function useWatchEnvironment(projectId, environmentId) {
-  const queryClient = useQueryClient();
-  useEffect(() => retainWatch(queryClient, projectId, environmentId), […]);
-
+function useNow(): number | null {
   return useSyncExternalStore(
-    <mark>subscribeToWatches,</mark>                                          // add a listener
-    <mark>() => watches.get(watchKey(projectId, environmentId))?.status,</mark>  // read it now
-    <mark>() => undefined,</mark>                                             // what the server renders
+    <mark>subscribeToClock,</mark>   // add a listener (starts the 1 s interval)
+    <mark>() => clockNow,</mark>     // read it now
+    <mark>() => null,</mark>         // what the server renders
   );
 }</pre>
         <div>
@@ -2144,18 +2167,17 @@ export function useWatchEnvironment(projectId, environmentId) {
             <b>getServerSnapshot</b>: “what should the server-rendered HTML say?”
           </p>
           <p>
-            The first watcher of an environment starts <code>keepEnvironmentLive</code> and the last
-            one to unmount stops it. So the project page and a chat widget showing the same
+            The watches need no React store at all. The first watcher of an environment starts
+            <code>keepEnvironmentLive</code> and the last one to unmount stops it
+            (<code>retainWatch</code>). So the project page and a chat widget showing the same
             environment share one set of subscriptions.
           </p>
           <p>
-            The third function matters for hydration. Effects don't run on the server, so nothing is
-            watched there, and the status is <code>undefined</code> (badge:
-            <i>Polling every 30s</i>). The badge switches to <i>Live</i> once the watch starts and
-            the socket connects. The clock's server snapshot is <code>null</code>, so
-            <code>Elapsed</code>
-            renders nothing on the server. The server's clock and the browser's clock would
-            disagree, and React would complain about mismatched HTML.
+            The third function matters for hydration. The clock's server snapshot is
+            <code>null</code>, so <code>Elapsed</code> renders nothing on the server. The server's
+            clock and the browser's clock would disagree, and React would complain about mismatched
+            HTML. Effects don't run on the server either, so nothing is watched there: the watch
+            starts once the page hydrates.
           </p>
         </div>
       </div>
@@ -2440,7 +2462,7 @@ export function useWatchEnvironment(projectId, environmentId) {
         ],
         [
           "Query key",
-          '<code>["project", projectId]</code>. The name of a cache entry. Same key, same entry, wherever you use it.',
+          '<code>["project", projectId, "project"]</code>. The name of a cache entry. Same key, same entry, wherever you use it. Keys work as prefixes: invalidating <code>projectScope(projectId)</code> = <code>["project", projectId]</code> hits every entry under it.',
         ],
         [
           "Invalidate",
@@ -2478,27 +2500,43 @@ export function useWatchEnvironment(projectId, environmentId) {
       const FILES = [
         { group: "Reading & writing (HTTP)" },
         {
-          path: "routes/projects/$projectId.tsx",
+          path: "routes/projects/$projectId/route.tsx",
           title: "The project page",
-          what: "Most of the user-visible feature. The loader fills the cache, the page reads it with <code>useSuspenseQuery</code> and calls <code>useWatchEnvironment</code> to keep it fresh and get the badge's status. Each service row has Start/Stop buttons built on <code>useMutation</code>, plus a status badge with a ticking <code>Elapsed</code> timer.",
-          why: "Environment is picked from <code>?environmentId=</code>, falling back to <code>production</code>, then the first one (<code>pickEnvironment</code>). UI comes from <code>@repo/ui</code> (<code>Item</code>, <code>Badge</code>, <code>Card</code>, <code>Button</code>).",
-          code: `const onSuccess = () =>
-  queryClient.invalidateQueries({ queryKey: projectQuery(projectId).queryKey });
-const deploy = useMutation({
-  mutationFn: () => deployServiceFn({ data: { serviceId: service.id, environmentId } }),
-  onSuccess,
-});`,
+          what: "The loader fills the cache before anything renders. <code>ProjectLayout</code> reads the project with <code>useSuspenseQuery</code> and calls <code>useWatchEnvironments</code> for every environment of the project, so it stays fresh while the project page (<code>index.tsx</code>) or a service's page is open. Those pages read the same <code>projectQuery</code>. Each service shows a status badge with a ticking <code>Elapsed</code> timer, and its buttons are <code>ActionButton</code>s.",
+          why: "Environment is picked from <code>?environmentId=</code>, falling back to Railway's primary environment, then <code>production</code>, then the first one (<code>pickEnvironment</code>). UI comes from <code>@repo/ui</code>.",
+          code: `loader: async ({ context, params }) => {
+  await context.queryClient.ensureQueryData(projectQuery(params.projectId));
+  return { dismissed: await getDismissedFn() };
+},
+…
+useWatchEnvironments([{ projectId, environmentIds: project.environments.map((e) => e.id) }]);`,
         },
         {
-          path: "railway/project.ts",
+          path: "domains/project/project.ts",
           title: "The project's data, in one place",
-          what: "Declares the <code>Project</code> GraphQL query, <code>fetchProject</code> (which flattens Railway's connection types into environments → services → latest deployment), the mutations, and the server functions around them (<code>getProjectFn</code>, <code>deployServiceFn</code>, <code>removeDeploymentFn</code>, …). It also exports <code>projectQuery</code>, the one cache entry for a project.",
-          why: "The project page and the chat widgets both read <code>projectQuery</code>, so a start or stop in either one shows up in both.",
-          code: `export const projectQuery = (projectId: string) =>
+          what: "Declares the <code>Project</code> GraphQL query, <code>fetchProject</code> (which flattens Railway's connection types into environments → services → latest deployment, plus links between services and recent deploys), the <code>getProjectFn</code> server function, and <code>projectQuery</code>, the one cache entry for a project. <code>projectScope</code> is the key prefix every query about the project lives under.",
+          why: "The overview, the project page, a service's page and the chat widgets all read <code>projectQuery</code>, so a start or stop in any of them shows up in all of them.",
+          code: `export const projectScope = (projectId: string) => ["project", projectId] as const;
+
+export const projectQuery = (projectId: string) =>
   queryOptions({
-    queryKey: ["project", projectId],
+    queryKey: [...projectScope(projectId), "project"],
     queryFn: () => getProjectFn({ data: { projectId } }),
+    staleTime: 30_000,
   });`,
+        },
+        {
+          path: "domains/actions/use-railway-action.ts",
+          title: "Every write, then one refresh",
+          what: "Every change the console makes goes through <code>domains/actions</code>: <code>RailwayAction</code> lists what buttons can do (restart, rollback, cancel, remove, deploy, remove-service), <code>runActionFn</code> runs one on the server, and <code>ActionButton</code> renders one. <code>useRailwayAction</code> and <code>useProjectMutation</code> invalidate <code>projectScope</code> afterwards, and only settle once the refetch is done.",
+          why: "Invalidating in one place means no button can forget to, and every screen showing the project agrees afterwards.",
+          code: `export function useProjectMutation<TVariables, TData>(projectId, mutationFn) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: projectScope(projectId) }),
+  });
+}`,
         },
         {
           path: "router.tsx",
@@ -2520,71 +2558,89 @@ const deploy = useMutation({
           code: `export const Route = createRootRouteWithContext<RouterContext>()({ … });`,
         },
         {
-          path: "railway/require-railway.ts",
+          path: "server/railway/require-railway.ts",
           title: "Signed-in-only middleware",
-          what: "Server-function middleware: get a fresh session (refreshing the token if under a minute is left), or answer 401. On success it adds <code>context.railway</code>, a typed GraphQL client using the user's token.",
+          what: "Server-function middleware: get a fresh session (refreshing the token if under a minute is left), or answer 401. On success it adds <code>context.railway</code>, a typed GraphQL client using the user's token, or the in-process mock if this browser picked it in the sidebar.",
           why: "Every server function that talks to Railway needs the same check, so it's written once.",
           code: `export const requireRailway = createMiddleware({ type: "function" }).server(async ({ next }) => {
-  const session = await getFreshSession();
-  if (!session) { setResponseStatus(401); throw new Error("Not signed in to Railway"); }
-  return next({ context: { railway: createRailwayClient(session.accessToken) } });
+  const railway = await getRailway();
+  if (!railway) { setResponseStatus(401); throw new Error("Not signed in to Railway"); }
+  return next({ context: { railway } });
 });`,
         },
         {
           path: "routes/index.tsx",
-          title: "Projects are links",
-          what: "Each project on the home page links to <code>/projects/$projectId</code>. The home page itself uses plain loader data (<code>getViewer</code>) and doesn't use TanStack Query.",
-          why: "",
-          code: `<Item render={<Link to="/projects/$projectId" params={{ projectId: project.id }} />}>
-  <ItemContent><ItemTitle>{project.name}</ItemTitle></ItemContent>
-</Item>`,
+          title: "The overview: every project at once",
+          what: "The home page reads <code>projectQuery</code> for every project the user shared, and keeps every environment of every loaded project live. A deploy anywhere, from anywhere, shows up without a reload.",
+          why: "It's the same cache entry the project page uses, so opening a project from the overview is instant.",
+          code: `const overviews = useQueries({ queries: listed.map((p) => projectQuery(p.id)) });
+…
+useWatchEnvironments(
+  loaded.map(({ project }) => ({ projectId: project.id, environmentIds: project.environments.map((e) => e.id) })),
+);`,
         },
-        { group: "Live updates (WebSocket)" },
+        { group: "Live updates (domains/live)" },
         {
-          path: "railway/live/environment-live.ts",
-          title: "keepEnvironmentLive: the brain",
-          what: "A plain function, not a hook: given a <code>QueryClient</code>, a project and an environment, it keeps <code>projectQuery</code> fresh until you call the function it returns. It subscribes to <code>canvasInvalidation</code> and to <code>deployment(id)</code> for each visible deployment. Every event leads to a debounced <code>invalidateQueries</code>. It runs a watchdog for silence, and switches its <code>QueryObserver</code> to polling when live isn't available. It reports <code>{ mode, connection }</code> through a callback.",
-          why: "Chapters 8 and 9 are about this file. Running outside React means no component has to stay mounted just to hold subscriptions.",
-          code: `const mode: LiveMode = canvasAvailable && connection === "connected" ? "live" : "polling";
-if (status?.mode !== mode) {
-  project.setOptions({ ...query, refetchInterval: mode === "polling" ? POLL_INTERVAL_MS : false });
-}
-status = { mode, connection };
-onStatus(status);`,
+          path: "domains/live/index.ts",
+          title: "Start here",
+          what: "The domain's public interface: <code>useWatchEnvironments</code> (keep environments live while mounted) and <code>useDeploymentLogStream</code> (stream a deployment's runtime logs into the cache). Its comment has a diagram of how the other files fit together.",
+          why: "Components only import from here, so everything else in the folder can change without touching them.",
+          code: `export { useDeploymentLogStream, useWatchEnvironments } from "./use-live";`,
         },
         {
-          path: "railway/live/watch-environment.ts",
-          title: "useWatchEnvironment: one watch per environment",
-          what: "The hook components call. It keeps a counted watch per environment: the first watcher starts <code>keepEnvironmentLive</code>, the last one to unmount stops it. It returns the environment's <code>LiveStatus</code> through <code>useSyncExternalStore</code> (Chapter 10).",
-          why: "The project page and chat widgets can show the same environment at once. Without the count, each would open its own subscriptions and fire its own refetches.",
-          code: `function retainWatch(queryClient, projectId, environmentId) {
-  const watch = watches.get(key) ?? startWatch(queryClient, projectId, environmentId, key);
-  watch.count += 1;
+          path: "domains/live/environment.ts",
+          title: "watchEnvironment: the brain",
+          what: "A plain function, not a hook, and it knows nothing about React or TanStack Query. Given a transport and an environment, it subscribes to <code>canvasInvalidation</code>, and to <code>deployment(id)</code> for whatever deployments it's told about (<code>setDeployments</code>). Pushes and reconnects become one debounced <code>onChange</code>. It runs a watchdog for silence, and reports through <code>onStatus</code> whether pushes can be trusted (<code>live</code>) or the data should poll (<code>polling</code>).",
+          why: "Chapters 8 and 9 are about this file. Because it only talks to a <code>LiveTransport</code>, <code>environment.test.ts</code> drives it with a fake connection and fake timers.",
+          code: `const updateStatus = () => {
+  const connection = transport.connection();
+  const mode: LiveMode = canvasAvailable && connection === "connected" ? "live" : "polling";
+  if (status?.mode === mode && status.connection === connection) return;
+  status = { mode, connection };
+  options.onStatus(status);
+};`,
+        },
+        {
+          path: "domains/live/use-live.ts",
+          title: "The only part that knows React and the cache",
+          what: "<code>keepEnvironmentLive</code> connects <code>watchEnvironment</code> to the query cache: a change invalidates <code>projectScope</code>, the deploys in flight in the project's data are the ones followed individually, and while pushes aren't available the project's query polls every 30 s. It keeps a counted watch per environment: the first watcher starts it, the last one to unmount stops it.",
+          why: "The overview, the project page and chat widgets can show the same environment at once. Without the count, each would open its own subscriptions and fire its own refetches.",
+          code: `function retainWatch(key: string, start: () => () => void): () => void {
+  const retained = watches.get(key) ?? { count: 0, stop: start() };
+  watches.set(key, retained);
+  retained.count += 1;
   return () => {
-    watch.count -= 1;
-    if (watch.count > 0) return;
-    watch.stop();
+    retained.count -= 1;
+    if (retained.count > 0) return;
+    retained.stop();
     watches.delete(key);
-    notify();
   };
 }`,
         },
         {
-          path: "railway/live/live-client.ts",
-          title: "The browser's one socket",
-          what: "A lazily created, app-wide <code>graphql-ws</code> client pointed at <code>/api/live</code>. Before every connection attempt it calls the <code>ensureLiveSession</code> server function so the cookie holds a fresh token. It exposes connection state (<code>getLiveConnection</code>, <code>onLiveConnectionChange</code>), a reconnect listener (<code>onReconnected</code>), and <code>subscribe</code>/<code>subscribeRaw</code>, which <b>resubscribe when Railway ends a subscription</b>.",
-          why: "Railway ends <code>canvasInvalidation</code> after ~95 s (measured). Without resubscribing, tabs would quietly stop noticing changes while still saying “Live.”",
+          path: "domains/live/transport.ts",
+          title: "The engine's view of the wire",
+          what: "The <code>LiveTransport</code> interface (<code>subscribe</code>, <code>connection</code>, <code>onConnectionChange</code>, <code>onReconnected</code>) and <code>keepSubscribed</code>, which <b>resubscribes when Railway ends a subscription</b>, with a back-off if one keeps ending right away.",
+          why: "Railway ends <code>canvasInvalidation</code> after ~95 s (measured). Without resubscribing, tabs would quietly stop noticing changes while still counting as live. <code>transport.test.ts</code> pins this down.",
           code: `complete: () => {
   if (stopped) return;   // graphql-ws also calls this after our own unsubscribe
   const lifetime = Date.now() - startedAt;
-  resubscribeTimer = setTimeout(start, lifetime < MIN_HEALTHY_LIFETIME_MS ? RESUBSCRIBE_BACKOFF_MS : 0);
+  resubscribeTimer = setTimeout(attempt, lifetime < MIN_HEALTHY_LIFETIME_MS ? RESUBSCRIBE_BACKOFF_MS : 0);
 },`,
         },
         {
-          path: "railway/live/live-socket.ts",
+          path: "domains/live/relay-client.ts",
+          title: "The browser's one socket",
+          what: "<code>relayTransport()</code>: a lazily created, app-wide <code>graphql-ws</code> client pointed at <code>/api/live</code>, wrapped as a <code>LiveTransport</code>. Before every connection attempt it calls the <code>ensureLiveSession</code> server function so the cookie holds a fresh token. It tracks the connection state and tells listeners when a dropped connection comes back.",
+          why: "One socket per tab, shared by every subscription on the page.",
+          code: `subscribe: (query, variables, handlers) =>
+  keepSubscribed((sink) => client.subscribe({ query, variables }, sink), handlers),`,
+        },
+        {
+          path: "domains/live/relay.ts",
           title: "The relay at /api/live",
-          what: "A Nitro WebSocket handler speaking <code>graphql-transport-ws</code> to the browser, and through its own <code>graphql-ws</code> clients to Railway. It authenticates the upgrade with the session cookie, validates every message with Zod, only lets single subscription operations through, routes internal-only fields to the internal endpoint, and closes with 1012 shortly before the token expires.",
-          why: "The browser must never hold the Railway token (Chapter 7).",
+          what: "A Nitro WebSocket handler speaking <code>graphql-transport-ws</code> to the browser, and through its own <code>graphql-ws</code> clients to Railway. It authenticates the upgrade with the session cookie, validates every message with Zod, only lets single subscription operations through, routes internal-only fields to the internal endpoint, and closes with 1012 shortly before the token expires. In mock mode the in-process mock answers instead of Railway.",
+          why: "The browser must never hold the Railway token (Chapter 7). It lives in <code>domains/live</code> rather than <code>server/</code> because it's part of this capability, not general infrastructure.",
           code: `async upgrade(request) {
   const session = await readSessionFromRequest(request);
   if (!session || session.accessTokenExpiresAt - Date.now() < TOKEN_EXPIRY_MARGIN_MS) {
@@ -2594,14 +2650,18 @@ onStatus(status);`,
 },`,
         },
         {
-          path: "server/session.ts",
+          path: "server/auth/session.ts",
           title: "Read the session from a raw Request",
           what: "Has <code>readSessionFromRequest(request)</code> next to <code>readSession()</code>. Both use the shared <code>decryptSession</code>.",
-          why: "<code>getCookie()</code> only works inside TanStack Start's request handling. The WebSocket upgrade is handled by Nitro directly, so it parses the <code>Cookie</code> header itself.",
+          why: "<code>getCookie()</code> only works inside TanStack Start's request handling. The WebSocket upgrade is handled by Nitro directly, so <code>getRequestCookie</code> parses the <code>Cookie</code> header itself.",
           code: `export async function readSessionFromRequest(request: Request): Promise<Session | null> {
+  return decryptSession(getRequestCookie(request, SESSION_COOKIE));
+}
+
+export function getRequestCookie(request: Request, name: string): string | undefined {
   const cookies = request.headers.get("cookie")?.split(/;\\s*/) ?? [];
-  const cookie = cookies.find((c) => c.startsWith(\`\${SESSION_COOKIE}=\`));
-  return decryptSession(cookie && decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1)));
+  const cookie = cookies.find((c) => c.startsWith(\`\${name}=\`));
+  return cookie && decodeURIComponent(cookie.slice(name.length + 1));
 }`,
         },
         {
@@ -2612,7 +2672,7 @@ onStatus(status);`,
           why: "",
           code: `nitro({
   features: { websocket: true },
-  handlers: [{ route: "/api/live", handler: "./src/railway/live/live-socket.ts" }],
+  handlers: [{ route: "/api/live", handler: "./src/domains/live/relay.ts" }],
 }),`,
         },
         { group: "Plumbing & docs" },
@@ -2663,11 +2723,11 @@ onStatus(status);`,
         const svg = $("#bigmap");
         const C = { b: "var(--browser)", s: "var(--server)", r: "var(--railway)", w: "var(--ws)" };
         const BOX = {
-          comp: [30, 40, 280, 84, "React components", "ProjectPage · ServiceRow", C.b],
-          cache: [30, 182, 280, 84, "TanStack Query cache", '["project", id] → data', C.b],
-          live: [30, 340, 280, 84, "live-client.ts", "one graphql-ws socket", C.b],
-          fns: [370, 104, 260, 124, "Server functions", "getProjectFn · deployServiceFn …", C.s],
-          relay: [370, 340, 260, 84, "/api/live relay", "live-socket.ts", C.s],
+          comp: [30, 40, 280, 84, "React components", "ProjectPage · ActionButton", C.b],
+          cache: [30, 182, 280, 84, "TanStack Query cache", '["project", id, …] → data', C.b],
+          live: [30, 340, 280, 84, "domains/live", "watchEnvironment · one socket", C.b],
+          fns: [370, 104, 260, 124, "Server functions", "getProjectFn · runActionFn …", C.s],
+          relay: [370, 340, 260, 84, "/api/live relay", "relay.ts", C.s],
           http: [690, 124, 280, 84, "HTTP /graphql/v2", "queries + mutations", C.r],
           wsp: [690, 300, 280, 58, "WS /graphql/v2", "deployment(id)", C.r],
           wsi: [690, 372, 280, 58, "WS /graphql/internal", "canvasInvalidation", C.r],
@@ -2707,7 +2767,7 @@ onStatus(status);`,
             "comp",
             "cache",
             C.b,
-            '<b>useSuspenseQuery</b> asks the cache for <code>["project", id]</code>.',
+            "<b>useSuspenseQuery</b> asks the cache for <code>projectQuery(id)</code>.",
           ],
           [
             "cache_r",
@@ -2752,7 +2812,7 @@ onStatus(status);`,
               "comp",
               "fns",
               C.b,
-              "Click <b>Start</b>: <code>deploy.mutate()</code> calls the <code>deployService</code> server function.",
+              'Click <b>Start</b>: <code>ActionButton</code> runs <code>{ kind: "deploy", … }</code> through <code>useRailwayAction</code>, which calls the <code>runActionFn</code> server function.',
             ],
             [
               "fns_r",
@@ -2768,7 +2828,7 @@ onStatus(status);`,
               "http",
               "fns",
               C.r,
-              "Railway replies <code>true</code>. That means “accepted,” not “here's the new state.”",
+              "Railway replies with the new deployment's ID. That means “accepted,” not “here's the new state.”",
             ],
             [
               "fns_l1",
@@ -2776,7 +2836,7 @@ onStatus(status);`,
               "fns",
               "comp",
               C.s,
-              "The server function resolves, and <code>onSuccess</code> runs in the browser.",
+              "The server function resolves, and <code>useProjectMutation</code>'s <code>onSuccess</code> runs in the browser.",
             ],
             [
               "comp_b",
@@ -2784,7 +2844,7 @@ onStatus(status);`,
               "comp",
               "cache",
               C.b,
-              '<code>invalidateQueries(["project", id])</code>: the entry is now stale, and since the page is watching it…',
+              "<code>invalidateQueries({ queryKey: projectScope(id) })</code>: every entry about the project is now stale, and since the page is watching it…",
             ],
             ...READ.slice(1),
           ],
@@ -2811,7 +2871,7 @@ onStatus(status);`,
               "live",
               "cache",
               C.b,
-              "The hash is new, so <code>keepEnvironmentLive</code> waits 250 ms for more events, then calls <code>invalidateQueries</code>. <b>The push carried no data</b>, so…",
+              "The hash is new, so <code>watchEnvironment</code> waits 250 ms for more events, then calls <code>onChange</code>, and <code>use-live.ts</code> invalidates <code>projectScope(id)</code>. <b>The push carried no data</b>, so…",
             ],
             ...READ.slice(1),
           ],
@@ -3097,7 +3157,7 @@ onStatus(status);`,
               label: "loader: ensureQueryData",
               title: "The loader runs before rendering",
               text: "<code>ensureQueryData</code> means “return the cached data if there is any, otherwise fetch it and wait.” The cache is empty, so it runs the <code>queryFn</code>.",
-              code: `loader: ({ context, params }) =>\n  context.queryClient.ensureQueryData(projectQuery(params.projectId)),`,
+              code: `loader: async ({ context, params }) => {\n  await context.queryClient.ensureQueryData(projectQuery(params.projectId));\n  return { dismissed: await getDismissedFn() };\n},`,
             },
             {
               from: "S",
@@ -3113,7 +3173,7 @@ onStatus(status);`,
               ch: "http",
               label: "POST /graphql/v2 · query Project",
               title: "Ask Railway",
-              text: "One request fetches the project, every environment, every service in it, and each service's latest deployment. GraphQL lets you ask for the whole tree at once.",
+              text: "One request fetches the project, every environment, every service in it, each service's latest deployment, and the project's recent deploys. GraphQL lets you ask for the whole tree at once.",
               env: `<span class="h">POST /graphql/v2</span>\nAuthorization: Bearer <span class="sec">eyJhbGciOi…</span>\n\n{ "query": "query Project($id: String!) { project(id: $id) { … } }",\n  "variables": { "id": "p1" } }`,
             },
             {
@@ -3122,8 +3182,8 @@ onStatus(status);`,
               ch: "http",
               label: "{ data: { project: … } }",
               title: "Railway answers, and the handler reshapes it",
-              text: 'GraphQL\'s <code>edges { node { … } }</code> wrapping is flattened into plain arrays, so components don\'t need to know about it. The result is stored in the cache under <code>["project", "p1"]</code>.',
-              code: `environments: project.environments.edges.map(({ node: environment }) => ({\n  id: environment.id,\n  name: environment.name,\n  services: environment.serviceInstances.edges.map(({ node: instance }) => ({ … })),\n})),`,
+              text: 'GraphQL\'s <code>edges { node { … } }</code> wrapping is flattened into plain arrays, so components don\'t need to know about it. The result is stored in the cache under <code>["project", "p1", "project"]</code>.',
+              code: `const environments = project.environments.edges.map(({ node: environment }) => {\n  const services = environment.serviceInstances.edges.map(({ node: instance }) => ({ … }));\n  …\n  return { id: environment.id, name: environment.name, services, links: [...links.values()] };\n});`,
             },
             {
               from: "S",
@@ -3140,7 +3200,7 @@ onStatus(status);`,
               label: "200 · HTML + cache payload",
               title: "Ready-to-show HTML",
               text: "The browser can paint the page immediately. Hidden inside it is the serialized cache entry. The Railway token is not in there: only the reshaped project data ever leaves the server.",
-              env: `<span class="h">HTTP/1.1 200 OK</span>\n&lt;main&gt;…my-project… api · Running … worker · Stopped…&lt;/main&gt;\n&lt;script&gt;/* dehydrated: ["project","p1"] → { id, name, environments: […] } */&lt;/script&gt;`,
+              env: `<span class="h">HTTP/1.1 200 OK</span>\n&lt;main&gt;…my-project… api · Running … worker · Stopped…&lt;/main&gt;\n&lt;script&gt;/* dehydrated: ["project","p1","project"] → { id, name, environments: […] } */&lt;/script&gt;`,
             },
             {
               from: "B",
@@ -3148,7 +3208,7 @@ onStatus(status);`,
               ch: "local",
               label: "hydrate: cache filled, no fetch",
               title: "Hydration",
-              text: "The browser creates <b>its own</b> <code>QueryClient</code> (once, for the life of the tab) and fills it from the payload. React attaches to the existing HTML. When <code>useSuspenseQuery</code> runs in the browser, the data is already there. Then the effect in <code>useWatchEnvironment</code> starts <code>keepEnvironmentLive</code>, and the live connection opens (Chapter 7).",
+              text: "The browser creates <b>its own</b> <code>QueryClient</code> (once, for the life of the tab) and fills it from the payload. React attaches to the existing HTML. When <code>useSuspenseQuery</code> runs in the browser, the data is already there. Then the effect in <code>useWatchEnvironments</code> starts <code>keepEnvironmentLive</code>, and the live connection opens (Chapter 7).",
             },
           ],
           nav: [
@@ -3216,7 +3276,7 @@ onStatus(status);`,
               ch: "local",
               label: "cache.set → render",
               title: "Into the cache, onto the screen",
-              text: 'The entry <code>["project", "p2"]</code> now exists. The page renders. The previous project\'s entry is still in the cache, so going back is instant.',
+              text: 'The entry <code>["project", "p2", "project"]</code> now exists. The page renders. The previous project\'s entry is still in the cache, so going back is instant.',
             },
           ],
           mut: [
@@ -3224,19 +3284,19 @@ onStatus(status);`,
               from: "B",
               to: "B",
               ch: "local",
-              label: "deploy.mutate()",
+              label: "mutation.mutate(action)",
               title: "Click Start",
-              text: "<code>useMutation</code> tracks the request's state. While <code>isPending</code> is true, the button is disabled.",
-              code: `const deploy = useMutation({\n  mutationFn: () => deployService({ data: { serviceId: service.id, environmentId } }),\n  onSuccess,\n});`,
+              text: "<code>ActionButton</code> runs its action through <code>useRailwayAction</code>, a <code>useMutation</code> underneath, which tracks the request's state. While <code>isPending</code> is true, the button is disabled.",
+              code: `<ActionButton projectId={projectId} label="Start" pending="Starting…"\n  action={{ kind: "deploy", serviceId, environmentId }} />\n\nexport function useRailwayAction(projectId: string) {\n  return useProjectMutation(projectId, (action: RailwayAction) => runActionFn({ data: action }));\n}`,
             },
             {
               from: "B",
               to: "S",
               ch: "http",
-              label: "POST /_serverFn/… (deployService)",
+              label: "POST /_serverFn/… (runActionFn)",
               title: "POST, because it changes something",
-              text: "Before the handler runs, the server checks the input with the zod <code>validator</code> (the browser can send anything) and runs <code>requireRailway</code>.",
-              code: `const deployService = createServerFn({ method: "POST" })\n  .middleware([requireRailway])\n  .validator(z.object({ serviceId: z.string(), environmentId: z.string() }))\n  .handler(async ({ data, context }) => { await context.railway(DeployMutation, data); });`,
+              text: "Before the handler runs, the server checks the input against <code>RailwayAction</code>, a zod union of every action (the browser can send anything), and runs <code>requireRailway</code>.",
+              code: `export const runActionFn = createServerFn({ method: "POST" })\n  .middleware([requireRailway])\n  .validator(RailwayAction)\n  .handler(({ data, context }) => runAction(context.railway, data));`,
             },
             {
               from: "S",
@@ -3251,9 +3311,9 @@ onStatus(status);`,
               from: "R",
               to: "S",
               ch: "http",
-              label: "{ serviceInstanceDeployV2: true }",
+              label: '{ serviceInstanceDeployV2: "d9…" }',
               title: "“Accepted.” That's all.",
-              text: "Railway doesn't return the new deployment. So the client has no data to put in the cache, and it doesn't try to guess.",
+              text: "Railway returns only the new deployment's ID, not its state. So the client has no data to put in the cache, and it doesn't try to guess.",
             },
             {
               from: "S",
@@ -3269,8 +3329,8 @@ onStatus(status);`,
               ch: "local",
               label: "onSuccess → invalidateQueries",
               title: "Don't patch the cache. Invalidate it.",
-              text: '<code>invalidateQueries</code> marks <code>["project", id]</code> as stale. Because the page is watching that entry, TanStack Query refetches it right away.',
-              code: `const onSuccess = () =>\n  queryClient.invalidateQueries({ queryKey: projectQuery(projectId).queryKey });`,
+              text: "<code>invalidateQueries</code> marks every entry under <code>projectScope(id)</code> as stale: the project, and a service's details if they're open. Because the page is watching them, TanStack Query refetches them right away. The mutation only settles once that's done.",
+              code: `return useMutation({\n  mutationFn,\n  onSuccess: () => queryClient.invalidateQueries({ queryKey: projectScope(projectId) }),\n});`,
             },
             {
               from: "B",
@@ -3302,7 +3362,7 @@ onStatus(status);`,
               ch: "http",
               label: "200 · fresh project",
               title: "Badge: ⟳ Deploying 0s",
-              text: "The row shows a spinner and starts counting. The refetched data has a new deployment ID, so <code>keepEnvironmentLive</code> subscribes to <code>deployment(newId)</code>. From here on, pushes take over (Chapter 8).",
+              text: "The service shows a spinner and starts counting. The refetched data has a new deploy in flight, so <code>use-live.ts</code> passes its ID to <code>watchEnvironment</code>, which subscribes to <code>deployment(newId)</code>. From here on, pushes take over (Chapter 8).",
             },
           ],
         },
@@ -3314,8 +3374,8 @@ onStatus(status);`,
           ["expire", "⑤ Token about to expire"],
         ],
         lanes: [
-          ["b", "🧑‍💻 Browser", "live-client.ts"],
-          ["s", "🖥️ Relay", "/api/live · live-socket.ts"],
+          ["b", "🧑‍💻 Browser", "relay-client.ts"],
+          ["s", "🖥️ Relay", "/api/live · relay.ts"],
           ["r", "🚂 Railway", "WebSocket endpoints"],
         ],
         legend: `${HTTP_LEGEND}<span><i style="border-color: var(--ws); border-top-style: dashed"></i>WebSocket frame</span>`,
@@ -3327,9 +3387,9 @@ onStatus(status);`,
               ch: "local",
               label: "first subscribe() → connect",
               title: "Lazy: no socket until it's needed",
-              text: "The page mounts, and <code>useWatchEnvironment</code> starts <code>keepEnvironmentLive</code>, which calls <code>subscribeRaw(CANVAS_INVALIDATION, …)</code>. That's the first subscription, so the graphql-ws client starts connecting. Before connecting, it calls our <code>url</code> function.",
+              text: "The page mounts, and <code>useWatchEnvironments</code> starts <code>keepEnvironmentLive</code>, whose <code>watchEnvironment</code> calls <code>transport.subscribe(CANVAS_INVALIDATION, …)</code>. That's the first subscription, so the graphql-ws client starts connecting. Before connecting, it calls our <code>url</code> function.",
               code: `url: async () => {\n  const { signedIn } = await ensureLiveSession();\n  if (!signedIn) { setConnection("signed-out"); throw new SignedOutError(…); }\n  return "ws://localhost:3000/api/live";\n},`,
-              file: "railway/live/live-client.ts",
+              file: "domains/live/relay-client.ts",
             },
             {
               from: "B",
@@ -3362,9 +3422,9 @@ onStatus(status);`,
               ch: "local",
               label: "upgrade(): decrypt cookie",
               title: "Authenticate the upgrade",
-              text: "Reject with 401 if there's no session or the token has under 60 s left. Otherwise, stash the token in the connection's private <code>context</code>. It stays on the server.",
-              code: `const session = await readSessionFromRequest(request);\nif (!session || session.accessTokenExpiresAt - Date.now() < TOKEN_EXPIRY_MARGIN_MS) {\n  throw new Response("Unauthorized", { status: 401 });\n}\nreturn { protocol: "graphql-transport-ws", context: { accessToken, accessTokenExpiresAt } };`,
-              file: "railway/live/live-socket.ts",
+              text: "Reject with 401 if there's no session or the token has under 60 s left. Otherwise, stash the token (and which backend this browser picked, real or mock) in the connection's private <code>context</code>. It stays on the server.",
+              code: `const session = await readSessionFromRequest(request);\nif (!session || session.accessTokenExpiresAt - Date.now() < TOKEN_EXPIRY_MARGIN_MS) {\n  throw new Response("Unauthorized", { status: 401 });\n}\nreturn { protocol: "graphql-transport-ws", context: { accessToken, accessTokenExpiresAt, backend } };`,
+              file: "domains/live/relay.ts",
             },
             {
               from: "S",
@@ -3391,7 +3451,7 @@ onStatus(status);`,
               title: "The relay answers itself",
               text: "No need to ask Railway: the upgrade was already authenticated.",
               code: `case "connection_init":\n  // The upgrade was already authenticated with the session cookie.\n  send({ type: "connection_ack" });`,
-              file: "railway/live/live-socket.ts",
+              file: "domains/live/relay.ts",
             },
             {
               from: "B",
@@ -3408,7 +3468,7 @@ onStatus(status);`,
               ch: "local",
               label: "endpointFor() → internal",
               title: "Pick an upstream",
-              text: "The relay parses the document. One operation, a subscription, and its only field is <code>canvasInvalidation</code>, so it goes to the internal endpoint. (Try it in the lab below.)",
+              text: "The relay parses the document. One operation, a subscription, and its only field is <code>canvasInvalidation</code>, so it goes to the internal endpoint. (Try it in the lab below.) In mock mode, every subscription goes to the in-process mock instead.",
             },
             {
               from: "S",
@@ -3441,9 +3501,9 @@ onStatus(status);`,
               ch: "ws",
               label: "next id=1 (forwarded)",
               title: "Forward, re-tagged with the browser's id",
-              text: "The relay passes the payload through untouched. <code>keepEnvironmentLive</code> receives it, sees a new hash, and schedules a refetch.",
+              text: "The relay passes the payload through untouched. <code>watchEnvironment</code> receives it, sees a new hash, and schedules a change, which becomes a refetch.",
               code: `next: (result) => send({ type: "next", id, payload: result }),`,
-              file: "railway/live/live-socket.ts",
+              file: "domains/live/relay.ts",
             },
           ],
           expire: [
@@ -3455,7 +3515,7 @@ onStatus(status);`,
               title: "Access tokens last one hour",
               text: "The relay can't refresh the token itself, because it has no HTTP response to set a cookie on. So it ends the connection a minute early and lets the browser start over.",
               code: `expiryTimer: setTimeout(() => peer.close(CLOSE_RECONNECT, "Session expiring"), expiresInMs),`,
-              file: "railway/live/live-socket.ts",
+              file: "domains/live/relay.ts",
             },
             {
               from: "S",
@@ -3478,8 +3538,8 @@ onStatus(status);`,
               to: "B",
               ch: "local",
               label: "connecting(isRetry) → “reconnecting”",
-              title: "Badge flips to polling for a moment",
-              text: '<code>connection</code> is no longer <code>"connected"</code>, so <code>mode</code> becomes <code>"polling"</code>. A 30 s poll interval is armed, but the reconnect usually finishes long before it fires.',
+              title: "Polling, for a moment",
+              text: '<code>connection()</code> is no longer <code>"connected"</code>, so <code>watchEnvironment</code> reports <code>mode: "polling"</code> and the project query gets a 30 s poll interval. The reconnect usually finishes long before it fires.',
             },
             {
               from: "B",
@@ -3536,9 +3596,9 @@ onStatus(status);`,
               ch: "local",
               label: "connected(wasRetry) → refetch",
               title: "Catch up on what was missed",
-              text: "Events that happened while disconnected are gone, so the reconnect listener schedules one refetch to be safe.",
-              code: `connected: (_socket, _payload, wasRetry) => {\n  setConnection("connected");\n  // Events may have been missed while disconnected.\n  if (wasRetry) for (const listener of reconnectListeners) listener();\n},`,
-              file: "railway/live/live-client.ts",
+              text: "Events that happened while disconnected are gone, so <code>watchEnvironment</code>'s reconnect listener counts it as a change and schedules one refetch to be safe.",
+              code: `connected: (_socket, _payload, wasRetry) => {\n  setConnection("connected");\n  if (wasRetry) for (const listener of reconnectListeners) listener();\n},`,
+              file: "domains/live/relay-client.ts",
             },
           ],
         },
@@ -3562,15 +3622,15 @@ onStatus(status);`,
         function render() {
           const age = Math.round((Date.now() - updated) / 1000);
           $("#cache-kv").innerHTML = `
-            <span class="k2">queryKey</span><span class="v">["project", "p1"]</span>
+            <span class="k2">queryKey</span><span class="v">["project", "p1", "project"]</span>
             <span class="k2">status</span><span class="v">${status}</span>
             <span class="k2">fetchStatus</span><span class="v ${fetching ? "k" : ""}">${fetching ? "fetching…" : "idle"}</span>
-            <span class="k2">isStale</span><span class="v">true <span class="muted">(staleTime: 0 by default, so data counts as stale right away)</span></span>
+            <span class="k2">isStale</span><span class="v">${age >= 30 ? "true" : "false"} <span class="muted">(staleTime: 30_000, so data stays fresh for 30 s; invalidating marks it stale right away)</span></span>
             <span class="k2">data</span><span class="v">{ name: "my-project", … } <span class="s">v${version}</span></span>
             <span class="k2">dataUpdatedAt</span><span class="v">${age}s ago</span>`;
           $("#cache-obs").innerHTML = `
             <div class="chip"><span><b>ProjectPage</b> · useSuspenseQuery</span><small>renders v${version}</small></div>
-            <div class="chip"><span><b>keepEnvironmentLive</b> · QueryObserver</span><small>refetchInterval: ${polling ? '<span class="k">30_000</span>' : "false"}</small></div>`;
+            <div class="chip"><span><b>keepEnvironmentLive</b> · QueryObserver</span><small>refetchInterval: ${polling ? '<span class="k">30_000</span>' : "the query's own"}</small></div>`;
           $("#cache-poll").textContent = polling
             ? "Live watcher: back to live"
             : "Live watcher: switch to polling";
@@ -3597,7 +3657,7 @@ onStatus(status);`,
         }
         $("#cache-inv").onclick = () => {
           log(
-            `<code>invalidateQueries({ queryKey: ["project","p1"] })</code>: marked stale; it has active observers, so refetch`,
+            `<code>invalidateQueries({ queryKey: projectScope("p1") })</code>: every entry under the prefix marked stale; this one has active observers, so refetch`,
           );
           fetchNow("invalidated");
         };
@@ -3609,10 +3669,19 @@ onStatus(status);`,
               `observer option changed: <code>refetchInterval: 30_000</code>. Sped up ×6 here so you don't have to wait`,
             );
             pollTimer = setInterval(() => fetchNow("refetchInterval"), 5000);
-          } else log(`<code>refetchInterval: false</code>: polling stopped`);
+          } else
+            log(
+              `<code>refetchInterval</code> back to the query's own: polling stopped (it only polls every 10 s while a deploy is in flight)`,
+            );
           render();
         };
         $("#cache-focus").onclick = () => {
+          if (Date.now() - updated < 30_000) {
+            log(
+              `window focus event: data is under 30 s old (<code>staleTime</code>), so nothing happens`,
+            );
+            return;
+          }
           log(
             `window focus event: data is stale and <code>refetchOnWindowFocus</code> is on by default`,
           );
@@ -3866,8 +3935,8 @@ onStatus(status);`,
               { type: "complete", id },
               `Railway ended it (it does this after ~95 s), and the relay passes it on. It lived ${Math.round(lived / 1000)} s, ` +
                 (healthy
-                  ? "so <code>subscribeRaw</code> resubscribes immediately."
-                  : "under the 10 s healthy minimum, so <code>subscribeRaw</code> backs off 10 s before resubscribing."),
+                  ? "so <code>keepSubscribed</code> resubscribes immediately."
+                  : "under the 10 s healthy minimum, so <code>keepSubscribed</code> backs off 10 s before resubscribing."),
             );
             later(healthy ? 500 : 10000, () => {
               const nid = String(nextId++);
@@ -4360,7 +4429,7 @@ onStatus(status);`,
         function renderMock() {
           const mode = canvasDown ? "polling" : "live";
           $("#sim-mock").innerHTML =
-            `<div class="top"><b>my-project</b><span class="badge ${mode === "live" ? "live" : "poll"}">${mode === "live" ? "● Live" : "Polling every 30s"}</span></div>
+            `<div class="top"><b>my-project</b><span class="badge ${mode === "live" ? "live" : "poll"}">${mode === "live" ? "● mode: live" : "mode: polling every 30s"}</span></div>
             ${Object.entries(view.services)
               .map(([n, s]) => svcRow(n, s, true))
               .join("")}`;
@@ -4464,7 +4533,7 @@ onStatus(status);`,
             "completed",
             "Railway ended it (95 s)",
             true,
-            "<code>subscribeRaw</code> resubscribes right away. Within seconds a hash arrives again, so nothing visible changes.",
+            "<code>keepSubscribed</code> resubscribes right away. Within seconds a hash arrives again, so nothing visible changes.",
           ],
           [
             "silent",
@@ -4476,7 +4545,7 @@ onStatus(status);`,
             "error",
             "errored / unexpected shape",
             false,
-            "<code>failCanvas()</code> marks <code>canvasInvalidation</code> down for good. An error frame ends the subscription, so the page polls until nothing on screen watches that environment any more (you switch environment or navigate away) and the watch starts fresh next time.",
+            "<code>failCanvas()</code> marks <code>canvasInvalidation</code> down. An error frame ends the subscription, so the page polls until nothing on screen watches that environment any more (you navigate away) and the watch starts fresh next time. An unexpected shape on a subscription that keeps going is down only until a valid push arrives.",
           ],
         ];
         let conn = "connected",
@@ -4506,15 +4575,15 @@ onStatus(status);`,
             cn = CONN.find((c) => c[0] === conn);
           const live = cv[2] && conn === "connected";
           $("#tt-badge").innerHTML =
-            `<span class="badge ${live ? "live" : "poll"}">${live ? "● Live" : "Polling every 30s"}</span>`;
+            `<span class="badge ${live ? "live" : "poll"}">${live ? "● mode: live" : "mode: polling every 30s"}</span>`;
           const v = $("#tt-why");
           v.className = `verdict ${live ? "ok" : "warn"}`;
           v.innerHTML = `<div style="font-family:var(--mono);font-size:.8rem;margin-bottom:8px">
               canvasAvailable = <b class="${cv[2] ? "good" : "bad"}">${cv[2]}</b> · connection === "connected" = <b class="${conn === "connected" ? "good" : "bad"}">${conn === "connected"}</b><br>
-              mode = <b>"${live ? "live" : "polling"}"</b> → refetchInterval: <b>${live ? "false" : "30_000"}</b></div>
+              mode = <b>"${live ? "live" : "polling"}"</b> → refetchInterval: <b>${live ? "the query's own" : "30_000"}</b></div>
             <p style="margin:4px 0"><b>Connection:</b> ${cn[2]}</p><p style="margin:4px 0"><b>canvasInvalidation:</b> ${cv[3]}</p>
             ${conn === "signed-out" ? `<p style="margin:4px 0" class="bad">Polling won't help much here: <code>getProjectFn</code> goes through <code>requireRailway</code>, so the refetches fail with 401 too.</p>` : ""}
-            ${!live && conn === "connected" ? `<p style="margin:4px 0" class="muted"><code>deployment(id)</code> subscriptions may still be pushing. They still trigger refetches, but they can't see new deployments, which is why their pushes alone don't count as Live.</p>` : ""}`;
+            ${!live && conn === "connected" ? `<p style="margin:4px 0" class="muted"><code>deployment(id)</code> subscriptions may still be pushing. They still trigger refetches, but they can't see new deployments, which is why their pushes alone don't count as live.</p>` : ""}`;
         }
         render();
 
@@ -4522,7 +4591,7 @@ onStatus(status);`,
           [
             "Railway ends <code>canvasInvalidation</code> after ~95 s (it always does)",
             "resubscribe",
-            "Measured: <code>canvasInvalidation</code> completes after exactly 95 s, even on a direct connection. Before <code>subscribeRaw</code> handled this, tabs kept showing “Live” while missing every start made elsewhere. Stops still synced through <code>deployment(id)</code>, which made the bug easy to miss.",
+            "Measured: <code>canvasInvalidation</code> completes after exactly 95 s, even on a direct connection. Before resubscribing (now <code>keepSubscribed</code>) handled this, tabs kept counting as live while missing every start made elsewhere. Stops still synced through <code>deployment(id)</code>, which made the bug easy to miss.",
           ],
           [
             "…and it keeps ending immediately",
@@ -4542,7 +4611,7 @@ onStatus(status);`,
           [
             "Wi-Fi drops / laptop sleeps",
             "reconnect + refetch",
-            "graphql-ws retries forever (<code>retryAttempts: Infinity</code>). The badge shows polling meanwhile. On reconnect, all subscriptions are re-sent automatically, and <code>onReconnected</code> schedules a refetch for anything missed.",
+            "graphql-ws retries forever (<code>retryAttempts: Infinity</code>). The project query polls meanwhile. On reconnect, all subscriptions are re-sent automatically, and the transport's <code>onReconnected</code> schedules a refetch for anything missed.",
           ],
           [
             "Access token about to expire",
@@ -4628,8 +4697,8 @@ onStatus(status);`,
           "Any signal refetches the <em>whole</em> project. That's simple and can't drift out of sync, but it costs one Railway API request per change, per open tab. The planned next phase is a reducer that applies push payloads directly and falls back to a refetch when unsure.",
         ],
         [
-          "Query defaults are untouched",
-          "The <code>QueryClient</code> uses <code>staleTime: 0</code>, so data counts as stale as soon as it arrives. TanStack Query will refetch on mount after hydration and whenever the tab regains focus. That's harmless here, but a small <code>staleTime</code> would skip the redundant first request.",
+          "Fresh for 30 seconds",
+          "<code>projectQuery</code> sets <code>staleTime: 30_000</code>, so hydrating or coming back to the tab within 30 s doesn't refetch. Live pushes and actions invalidate explicitly, so they're unaffected. While a deploy is in flight, the query also polls every 10 s on its own.",
         ],
         [
           "Relay state lives in memory",
@@ -4640,8 +4709,8 @@ onStatus(status);`,
           "30 s polling is 120 requests per hour per tab, against a Hobby limit of ~1,000/hour. Fine for a few tabs, but worth knowing if a page polls for long.",
         ],
         [
-          "Two ways to load data",
-          "The home page still uses plain loader data. The project page uses TanStack Query. Both work. Query is there because the project page needs a cache that can be invalidated and refetched from outside the component tree.",
+          "One query for every screen",
+          "The overview, the project page, a service's page and the chat widgets all read <code>projectQuery</code>, so they can't disagree. The flip side: the overview keeps every environment of every project live, which is one <code>canvasInvalidation</code> subscription (and one refetch per change) per environment.",
         ],
       ];
       $("#tradeoff-grid").innerHTML = TRADEOFFS.map(
@@ -4710,12 +4779,12 @@ onStatus(status);`,
           "Someone starts a stopped service from the CLI. Which signal tells your page first?",
           [
             "canvasInvalidation: the new deployment's ID isn't on screen yet, so no deployment(id) subscription exists for it",
-            "deployment(id), since you're subscribed to every deployment",
+            "deployment(id), since you're subscribed to every deployment on screen",
             "Polling",
             "The mutation's onSuccess",
           ],
           0,
-          "The <code>deployment(id)</code> subscriptions follow the data on screen. Only after the <code>canvasInvalidation</code>-triggered refetch reveals the new deployment does a <code>deployment(newId)</code> subscription start.",
+          "The <code>deployment(id)</code> subscriptions follow the deploys in flight on screen. Only after the <code>canvasInvalidation</code>-triggered refetch reveals the new deployment does a <code>deployment(newId)</code> subscription start.",
         ],
       ];
       let score = 0,

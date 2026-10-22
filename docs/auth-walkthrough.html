@@ -1048,13 +1048,14 @@
       <h3>The scopes Console asks for</h3>
       <p>
         Scopes are the list of things on the valet key. They're set in
-        <code>railway-oauth.ts</code>:
+        <code>server/auth/oauth.ts</code>:
       </p>
       <div class="grid g4" id="scopes"></div>
       <p class="muted" style="margin-top: 14px">
         Because of <code>project:member</code>, the token only covers the projects the user ticked.
-        That's why <code>viewer.ts</code> queries <code>externalWorkspaces</code> (“what was shared
-        with me?”) and not <code>projects</code>, which this kind of token isn't allowed to call.
+        That's why <code>domains/project/viewer.ts</code> queries
+        <code>externalWorkspaces</code> (“what was shared with me?”) and not <code>projects</code>,
+        which this kind of token isn't allowed to call.
       </p>
     </section>
 
@@ -1063,8 +1064,8 @@
       <div class="eyebrow">Chapter 2</div>
       <h2>What changed</h2>
       <p class="lede">
-        Three new URLs, three new server modules, a rewritten home page, and some new dependencies.
-        Click a file to see what it does.
+        Three new URLs, three new server modules, a root route that loads the signed-in user, and
+        some new dependencies. Click a file to see what it does.
       </p>
       <div class="files" style="margin-top: 18px">
         <div class="filelist card" id="filelist" style="padding: 10px"></div>
@@ -1160,7 +1161,7 @@
         <div class="verdict" id="st-verdict"></div>
         <pre
           class="code"
-          data-file="apps/console/src/railway/railway-oauth.ts — finishLogin()"
+          data-file="apps/console/src/server/auth/oauth.ts — finishLogin()"
         >const expectedState = getCookie(STATE_COOKIE);
 const codeVerifier = getCookie(VERIFIER_COOKIE);
 deleteCookie(STATE_COOKIE, cookieDefaults());     // one use only, even if the checks below fail
@@ -1314,7 +1315,7 @@ deleteCookie(VERIFIER_COOKIE, cookieDefaults());
         </p>
         <pre
           class="code"
-          data-file="apps/console/src/server/session.ts"
+          data-file="apps/console/src/server/auth/session.ts"
         >async function encryptionKey() {
   // SHA-256 squeezes any-length SESSION_SECRET into exactly the 32 bytes AES-256 needs
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(env.SESSION_SECRET));
@@ -1342,12 +1343,13 @@ async function decryptSession(token) {
       <div class="eyebrow">Chapter 7 · Deep dive</div>
       <h2>Cookie flags: what each one is for</h2>
       <p class="lede">
-        All three cookies (<code>railway_session</code>, <code>railway_oauth_state</code>,
-        <code>railway_oauth_verifier</code>) share <code>cookieDefaults()</code>. Click a card to
-        see what goes wrong without that flag.
+        All four cookies (<code>railway_session</code>, <code>railway_oauth_state</code>,
+        <code>railway_oauth_verifier</code>, and <code>railway_backend</code>, which picks the real
+        or mock Railway) share <code>cookieDefaults()</code>. Click a card to see what goes wrong
+        without that flag.
       </p>
       <div class="grid g4" id="flagcards" style="margin-top: 16px"></div>
-      <pre class="code" data-file="apps/console/src/server/session.ts">
+      <pre class="code" data-file="apps/console/src/server/auth/session.ts">
 export const cookieDefaults = () => ({
   httpOnly: true,
   secure: env.NODE_ENV === "production",
@@ -1365,7 +1367,8 @@ export const cookieDefaults = () => ({
         an hour so a leaked one doesn't stay useful for long. The
         <span class="k">refresh token</span> lasts longer and can only be used at the token
         endpoint, together with the client secret, to get a new access token.
-        <code>getFreshSession()</code> runs on every page load and handles the switch.
+        <code>getFreshSession()</code> runs on every page load (through <code>getRailway()</code>)
+        and handles the switch.
       </p>
       <div class="lab">
         <div class="lab-head">
@@ -1406,7 +1409,7 @@ export const cookieDefaults = () => ({
         <pre
           class="code"
           id="ck-code"
-          data-file="apps/console/src/railway/railway-oauth.ts — getFreshSession()"
+          data-file="apps/console/src/server/auth/oauth.ts — getFreshSession()"
         ></pre>
         <p class="muted" style="font-size: 0.9rem">
           Why <code>prompt=consent</code> and <code>offline_access</code>? Railway only issues a
@@ -1445,12 +1448,12 @@ export const cookieDefaults = () => ({
           <div class="eyebrow b">🧑‍💻 Browser</div>
           <div class="chip"><span>Encrypted cookie blob</span><small>httpOnly, opaque</small></div>
           <div class="chip">
-            <span><code>{ user: { name, email } }</code></span
-            ><small>getViewer() return</small>
+            <span><code>{ viewer: { user: { name, email } } }</code></span
+            ><small>getShell() return</small>
           </div>
           <div class="chip">
-            <span><code>{ workspaces: [{ id, name, projects }] }</code></span
-            ><small>getViewer() return</small>
+            <span><code>{ viewer: { workspaces: [{ id, name, projects }] } }</code></span
+            ><small>getShell() return</small>
           </div>
           <div class="chip"><span>Rendered HTML</span><small>Home component</small></div>
           <p class="muted" style="font-size: 0.85rem; margin-top: 10px">
@@ -1468,30 +1471,41 @@ export const cookieDefaults = () => ({
       </div>
       <pre
         class="code"
-        data-file="apps/console/src/routes/index.tsx + apps/console/src/railway/viewer.ts"
-      >const getViewer = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await getFreshSession();      // decrypt cookie, refresh if needed
-  if (!session) return null;                     // → Home renders "Login with Railway"
-
-  return fetchViewer(createRailwayClient(session.accessToken));
+        data-file="apps/console/src/routes/__root.tsx + server/railway/backend.ts + domains/project/viewer.ts"
+      >const getShell = createServerFn({ method: "GET" }).handler(async () => {
+  const railway = await getRailway();                          // null → Home renders "Login with Railway"
+  const viewer = railway ? await fetchViewer(railway) : null;
+  return { viewer, backend: readBackend(), sidebarOpen: getCookie("sidebar_state") !== "false" };
 });
 
-export const Route = createFileRoute("/")({
-  loader: () => getViewer(),
-  component: Home,
+export const Route = createRootRouteWithContext&lt;RouterContext&gt;()({
+  loader: () => getShell(),
+  // …
 });
 
-// railway/viewer.ts
+// server/railway/backend.ts
+export async function getRailway() {
+  const session = await getFreshSession();                     // decrypt cookie, refresh if needed
+  if (!session) return null;
+  const railway = createRailwayClient(session.accessToken);
+  return readBackend() === "mock" ? createMockRailwayClient(mockRailway(), railway) : railway;
+}
+
+// domains/project/viewer.ts
 export async function fetchViewer(railway: RailwayClient) {
   const { me, externalWorkspaces } = await railway(ViewerQuery);
-  <mark>return { user: me, workspaces: externalWorkspaces };   // ← the only thing that crosses the wall</mark>
+  <mark>return { user: me, workspaces: externalWorkspaces };   // ← the only Railway data that crosses the wall</mark>
 }</pre>
       <p class="muted" style="font-size: 0.9rem">
         The GraphQL query is typed end-to-end by <b>gql.tada</b>: <code>ViewerQuery</code> (in
-        <code>viewer.ts</code>) is checked against Railway's schema at compile time, so
-        <code>viewer.workspaces[0].projects[0].name</code> autocompletes.
-        <code>railway-api.ts</code> is a thin <code>fetch</code> that adds the
+        <code>domains/project/viewer.ts</code>) is checked against Railway's schema at compile time,
+        so <code>viewer.workspaces[0].projects[0].name</code> autocompletes.
+        <code>server/railway/railway-api.ts</code> is a thin <code>fetch</code> that adds the
         <code>Bearer</code> header and turns GraphQL <code>errors</code> into thrown exceptions.
+        <code>getRailway()</code> also reads the <code>railway_backend</code> cookie: in mock mode
+        the same calls are answered by an in-process fake Railway (<code>@repo/railway-mock</code>).
+        Mock mode still needs a Railway sign-in, because public data like templates comes from the
+        real API with the user's token.
       </p>
     </section>
 
@@ -1526,11 +1540,13 @@ export async function fetchViewer(railway: RailwayClient) {
           <h3 style="margin-top: 0">🏁 Two tabs refreshing at once</h3>
           <p class="muted">
             If two requests arrive in the last minute before expiry, both will refresh. This can
-            even happen within one page load: the root route's loader (<code>getSignedIn</code> in
-            <code>__root.tsx</code>) and the home loader each call <code>getFreshSession()</code>,
-            and TanStack Router runs them in parallel. If Railway rotates refresh tokens and rejects
-            reuse of an old one, the slower call fails and that part of the render shows signed-out.
-            The cookie written by the other call survives, so the next load is fine.
+            even happen within one page load: the root loader (<code>getShell</code> in
+            <code>__root.tsx</code>) and then each project the home loader prefetches go through
+            <code>getRailway()</code> → <code>getFreshSession()</code>, and the prefetches run in
+            parallel. They all read the cookie the request arrived with, so none of them sees a
+            token another one just refreshed. If Railway rotates refresh tokens and rejects reuse of
+            an old one, the slower calls fail and those parts of the render show signed-out or
+            unavailable. The cookie written by the other call survives, so the next load is fine.
           </p>
         </div>
         <div class="card">
@@ -1699,21 +1715,20 @@ export async function fetchViewer(railway: RailwayClient) {
 },`,
         },
         {
-          path: "routes/index.tsx",
+          path: "routes/__root.tsx",
           tag: "mod",
-          title: "The home page",
-          what: "Was “Hello, world”. Now its <b>loader</b> calls the <code>getViewer</code> server function, which runs the <code>Viewer</code> query via <code>fetchViewer()</code> (now in <code>railway/viewer.ts</code>). Signed out (<code>null</code>) shows a Login button. Signed in shows your name, a Log out form, and a card per shared workspace (using <code>Card</code>, <code>Empty</code>, <code>Button</code> from <code>@repo/ui</code>).",
+          title: "The root route",
+          what: "Its <b>loader</b> calls the <code>getShell</code> server function: <code>getRailway()</code> reads the session (refreshing it if needed), and <code>fetchViewer()</code> (in <code>domains/project/viewer.ts</code>) runs the <code>Viewer</code> query. Signed out (<code>viewer: null</code>), there's no app shell and the home page shows a Login link. Signed in, the sidebar lists your shared workspaces and has a Log out form.",
           why: "The loader runs before render, so the page never flashes “signed out” and then re-renders.",
-          code: `const getViewer = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await getFreshSession();
-  if (!session) return null;
-
-  return fetchViewer(createRailwayClient(session.accessToken));
+          code: `const getShell = createServerFn({ method: "GET" }).handler(async () => {
+  const railway = await getRailway();
+  const viewer = railway ? await fetchViewer(railway) : null;
+  return { viewer, backend: readBackend(), sidebarOpen: getCookie("sidebar_state") !== "false" };
 });`,
         },
         { group: "Server modules (never shipped to the browser)" },
         {
-          path: "railway/railway-oauth.ts",
+          path: "server/auth/oauth.ts",
           tag: "new",
           title: "The OAuth dance",
           what: "Three functions: <code>startLogin()</code> (make state + PKCE verifier, set temp cookies, build the Railway URL), <code>finishLogin()</code> (verify state, swap code for tokens, save the session), and <code>getFreshSession()</code> (read the session, refresh if under a minute left).",
@@ -1728,10 +1743,10 @@ const railwayOAuth = () =>
   );`,
         },
         {
-          path: "server/session.ts",
+          path: "server/auth/session.ts",
           tag: "new",
           title: "The encrypted cookie",
-          what: "Defines the <code>Session</code> shape (access token, refresh token, expiry), and <code>readSession</code> / <code>writeSession</code> / <code>clearSession</code> (plus <code>readSessionFromRequest</code>, added later for the live WebSocket). Encryption is done by <b>jose</b> as a JWE: “a JWT, but encrypted instead of just signed.”",
+          what: "Defines the <code>Session</code> shape (access token, refresh token, expiry), and <code>readSession</code> / <code>writeSession</code> / <code>clearSession</code> (plus <code>readSessionFromRequest</code>, added later for the WebSocket upgrade in <code>domains/live/relay.ts</code>). Encryption is done by <b>jose</b> as a JWE: “a JWT, but encrypted instead of just signed.”",
           why: "No database needed. Validation with zod means a cookie from an older version of the code is treated as signed-out instead of crashing.",
           code: `const Session = z.object({
   accessToken: z.string(),
@@ -1740,7 +1755,7 @@ const railwayOAuth = () =>
 });`,
         },
         {
-          path: "railway/railway-api.ts",
+          path: "server/railway/railway-api.ts",
           tag: "new",
           title: "Typed GraphQL client",
           what: "<code>createRailwayClient(accessToken)</code> returns a function that POSTs a gql.tada document to <code>backboard.railway.com/graphql/v2</code> with <code>Authorization: Bearer …</code>, and throws on HTTP or GraphQL errors.",
@@ -1750,6 +1765,19 @@ const railwayOAuth = () =>
   authorization: \`Bearer \${accessToken}\`,
 },
 body: JSON.stringify({ query: print(document), variables }),`,
+        },
+        {
+          path: "server/railway/backend.ts",
+          tag: "",
+          title: "Real or mock Railway (added later)",
+          what: "<code>getRailway()</code> is what everything signed-in calls: the root loader, the <code>requireRailway</code> middleware on server functions, the chat. It gets a fresh session and returns a client for the backend this browser picked with the <code>railway_backend</code> cookie: the real API, or the in-process mock.",
+          why: "Mock mode still signs in with Railway: public data like templates comes from the real API, with the user's token.",
+          code: `export async function getRailway(): Promise<RailwayClient | null> {
+  const session = await getFreshSession();
+  if (!session) return null;
+  const railway = createRailwayClient(session.accessToken);
+  return readBackend() === "mock" ? createMockRailwayClient(mockRailway(), railway) : railway;
+}`,
         },
         {
           path: "server/env.ts",
@@ -1825,7 +1853,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
             label: "GET /",
             ch: "front",
             title: "You open Console",
-            text: "There's no session cookie yet. The home route's loader runs <code>getViewer()</code> on the server.",
+            text: "There's no session cookie yet. The root route's loader runs <code>getShell()</code> on the server.",
             env: `<span class="h">GET / HTTP/1.1</span>\nHost: localhost:3000\nCookie: <span class="muted">(none)</span>`,
           },
           {
@@ -1834,8 +1862,8 @@ APP_URL: z.url().default("http://localhost:3000"),`,
             label: "200 · “Login with Railway”",
             ch: "front",
             title: "Signed-out page",
-            text: "<code>getFreshSession()</code> finds no cookie and returns <code>null</code>, so <code>getViewer()</code> returns <code>null</code> and <code>Home</code> renders the login link.",
-            code: `if (!viewer) {\n  return <a href="/auth/login" className={buttonVariants()}>Login with Railway</a>;\n}`,
+            text: "<code>getFreshSession()</code> finds no cookie and returns <code>null</code>, so <code>getRailway()</code> does too, <code>getShell()</code> returns <code>viewer: null</code>, and <code>Home</code> renders the login link.",
+            code: `if (!viewer) {\n  return (\n    <main className="grid min-h-svh place-content-center gap-4 text-center">\n      <a href="/auth/login" className={buttonVariants()}>Login with Railway</a>\n    </main>\n  );\n}`,
           },
           {
             from: "B",
@@ -2031,7 +2059,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
             label: "POST /graphql/v2 (new token)",
             ch: "back",
             title: "Carry on as normal",
-            text: "The rest of <code>getViewer()</code> doesn't know or care that a refresh just happened.",
+            text: "The rest of <code>getShell()</code> doesn't know or care that a refresh just happened.",
           },
           {
             from: "R",
@@ -2059,7 +2087,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
             ch: "front",
             title: "Click “Log out”",
             text: "It's a real <code>&lt;form method=\"post\"&gt;</code>, so it works even before JavaScript loads. It's POST because GET requests happen by accident (prefetching, <code>&lt;img&gt;</code> tags, link previews).",
-            code: `<form method="post" action="/auth/logout">\n  <Button type="submit" variant="outline">Log out</Button>\n</form>`,
+            code: `<form method="post" action="/auth/logout">\n  <DropdownMenuItem nativeButton render={<button type="submit" … />}>\n    <LogOutIcon />\n    Log out\n  </DropdownMenuItem>\n</form>`,
           },
           {
             from: "S",
@@ -2076,7 +2104,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
             label: "GET /  (no cookie)",
             ch: "front",
             title: "Back to square one",
-            text: "No cookie, so <code>getViewer()</code> returns <code>null</code>.",
+            text: "No cookie, so <code>getShell()</code> returns <code>viewer: null</code>.",
           },
           {
             from: "S",
@@ -2520,7 +2548,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
         [
           'path: "/"',
           "The cookie is sent for every URL on the site.",
-          "If it were scoped to, say, <code>/auth</code>, the home page loader would never see the session. And <code>deleteCookie</code> must use the same path as <code>setCookie</code>, which is why both reuse <code>cookieDefaults()</code>.",
+          "If it were scoped to, say, <code>/auth</code>, the root loader would never see the session. And <code>deleteCookie</code> must use the same path as <code>setCookie</code>, which is why both reuse <code>cookieDefaults()</code>.",
         ],
       ];
       $("#flagcards").innerHTML = FLAGS.map(
@@ -2586,8 +2614,8 @@ APP_URL: z.url().default("http://localhost:3000"),`,
 
       /* ================================================================ devtools sim */
       const DT = {
-        cookie: `<span class="prompt">&gt;</span> document.cookie\n<span class="good">''</span>\n<span class="muted">// Empty string. railway_session is httpOnly, so page JavaScript can't see it at all.\n// (You can see it in the Application → Cookies panel, as an encrypted blob.)</span>`,
-        data: `<span class="prompt">&gt;</span> // what TanStack serialised into the page for hydration\n{\n  user: { name: <span class="good">"Ada"</span>, email: <span class="good">"ada@example.com"</span> },\n  workspaces: [{ id: <span class="good">"w1"</span>, name: <span class="good">"Personal"</span>, projects: [ … ] }]\n}\n<span class="muted">// No accessToken anywhere. It never left the server.</span>`,
+        cookie: `<span class="prompt">&gt;</span> document.cookie\n<span class="good">'sidebar_state=true'</span>\n<span class="muted">// Only UI cookies. railway_session (and railway_backend) are httpOnly, so page JavaScript can't see them at all.\n// (You can see them in the Application → Cookies panel; the session is an encrypted blob.)</span>`,
+        data: `<span class="prompt">&gt;</span> // what TanStack serialised into the page for hydration (the root loader's data)\n{\n  viewer: {\n    user: { name: <span class="good">"Ada"</span>, email: <span class="good">"ada@example.com"</span>, avatar: <span class="good">null</span> },\n    workspaces: [{ id: <span class="good">"w1"</span>, name: <span class="good">"Personal"</span>, projects: [ … ] }]\n  },\n  backend: <span class="good">"railway"</span>,\n  sidebarOpen: <span class="good">true</span>\n}\n<span class="muted">// No accessToken anywhere. It never left the server.</span>`,
         fetch: `<span class="prompt">&gt;</span> await fetch("https://backboard.railway.com/graphql/v2", { method: "POST", … })\n<span class="bad">✗ You'd need an "Authorization: Bearer …" header, and the browser has no token to put in it.</span>\n<span class="muted">// Every Railway call has to go through Console's server.</span>`,
       };
       $$("[data-dt]").forEach(
@@ -2651,7 +2679,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
         [
           "Railway's GraphQL API returns an error",
           "error page",
-          "<code>createRailwayClient</code> throws (<i>“Railway API: …”</i>). The loader rejects and TanStack Router shows its default error UI. The route doesn't define a custom <code>errorComponent</code> yet.",
+          "<code>createRailwayClient</code> throws (<i>“Railway API: …”</i>). The root loader (<code>getShell</code>) rejects and TanStack Router shows its default error UI. No route defines a custom <code>errorComponent</code> yet.",
         ],
       ];
       $("#faillist").innerHTML = FAILS.map(

@@ -9,9 +9,9 @@ import { InsightsPanel } from "../components/overview/insights-panel";
 import { NeedsYouCard } from "../components/overview/needs-you-card";
 import { ProjectCard } from "../components/overview/project-card";
 import { getDismissedFn, useDismissed } from "../domains/insights/dismissed";
-import { healthOf, timeAgo } from "../domains/insights/health";
-import { FAILURE_RULES, insightsFor } from "../domains/insights/insights";
+import { timeAgo } from "../domains/insights/health";
 import type { Insight } from "../domains/insights/insights";
+import { triage } from "../domains/insights/triage";
 import { useWatchEnvironments } from "../domains/live";
 import { projectQuery } from "../domains/project/project";
 import type { Project } from "../domains/project/project";
@@ -90,38 +90,28 @@ function Overview(props: { viewer: Viewer }) {
       environmentIds: project.environments.map((e) => e.id),
     })),
   );
-  const insights = insightsFor(loaded);
-  const visible = insights.filter((i) => !dismissed.isDismissed(i.key));
-  const hidden = insights.filter((i) => dismissed.isDismissed(i.key));
-  const hiddenFailures = hidden.filter((i) => FAILURE_RULES.has(i.rule));
-  const hiddenOthers = hidden.filter((i) => !FAILURE_RULES.has(i.rule));
-  const failures = visible.filter(
-    (i): i is Insight & { service: NonNullable<Insight["service"]> } =>
-      FAILURE_RULES.has(i.rule) && i.service !== undefined,
-  );
-  const inFlight = loaded.flatMap(({ project }) =>
-    healthOf(project)
-      .attention.filter((s) => s.state.kind === "pending")
-      .map((service) => ({ project, service })),
-  );
-  // A project with a card under "Needs you" isn't repeated below. Dismissing the card brings it back.
-  const brokenProjects = new Set(failures.map((i) => i.project.id));
+  const {
+    needsYou,
+    inFlight,
+    suggestions,
+    dismissed: hidden,
+    brokenProjects,
+    summary,
+  } = triage(loaded, { isDismissed: dismissed.isDismissed, projectCount: listed.length });
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-10 p-8 xl:grid-cols-[minmax(0,1fr)_320px]">
       <main className="@container grid content-start gap-10">
         <header className="grid gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">
-            {summary(failures.length, inFlight.length, listed.length)}
-          </p>
+          <p className="text-muted-foreground">{summary}</p>
         </header>
 
         <section className="grid gap-3">
-          {failures.length > 0 ? (
+          {needsYou.length > 0 ? (
             <>
               <SectionLabel>Needs you</SectionLabel>
-              {failures.map((insight) => (
+              {needsYou.map((insight) => (
                 <NeedsYouCard
                   key={insight.key}
                   insight={insight}
@@ -136,7 +126,7 @@ function Overview(props: { viewer: Viewer }) {
               Nothing needs you right now.
             </div>
           )}
-          <ShowDismissed insights={hiddenFailures} onRestore={dismissed.restore} />
+          <ShowDismissed insights={hidden.needsYou} onRestore={dismissed.restore} />
         </section>
 
         {inFlight.length > 0 && (
@@ -198,10 +188,10 @@ function Overview(props: { viewer: Viewer }) {
       </main>
 
       <InsightsPanel
-        insights={visible.filter((i) => !FAILURE_RULES.has(i.rule))}
+        insights={suggestions}
         onDismiss={(insight) => dismissed.dismiss(insight.key)}
         className="xl:sticky xl:top-20 xl:self-start"
-        footer={<ShowDismissed insights={hiddenOthers} onRestore={dismissed.restore} />}
+        footer={<ShowDismissed insights={hidden.suggestions} onRestore={dismissed.restore} />}
       />
     </div>
   );
@@ -231,19 +221,6 @@ function UnavailableCard(props: { name: string; error?: string }) {
       </p>
     </article>
   );
-}
-
-function summary(broken: number, inFlight: number, total: number) {
-  const parts = [];
-  if (broken > 0) parts.push(`${broken} ${broken === 1 ? "thing needs" : "things need"} you`);
-  if (inFlight > 0) parts.push(`${inFlight} ${inFlight === 1 ? "deploy" : "deploys"} in flight`);
-  parts.push(
-    broken + inFlight === 0
-      ? `${total === 1 ? "your project is" : `all ${total} projects are`} fine`
-      : "everything else is fine",
-  );
-  const sentence = parts.join(", ");
-  return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`;
 }
 
 function SectionLabel(props: { children: React.ReactNode }) {
