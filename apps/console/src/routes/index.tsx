@@ -5,17 +5,17 @@ import { useQueries } from "@tanstack/react-query";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { CircleCheckIcon } from "lucide-react";
 
-import { getDismissedFn, useDismissed } from "../overview/dismissed";
-import { healthOf, timeAgo } from "../overview/health";
-import { FAILURE_RULES, insightsFor } from "../overview/insights";
-import type { Insight } from "../overview/insights";
-import { InsightsPanel } from "../overview/insights-panel";
-import { NeedsYouCard } from "../overview/needs-you-card";
-import { ProjectCard } from "../overview/project-card";
-import { useWatchEnvironments } from "../railway/live/watch-environment";
-import { projectOverviewQuery, projectUsageQuery } from "../railway/overview";
-import type { ProjectOverview, ProjectUsage } from "../railway/overview";
-import type { Viewer } from "../railway/viewer";
+import { InsightsPanel } from "../components/overview/insights-panel";
+import { NeedsYouCard } from "../components/overview/needs-you-card";
+import { ProjectCard } from "../components/overview/project-card";
+import { getDismissedFn, useDismissed } from "../domains/insights/dismissed";
+import { healthOf, timeAgo } from "../domains/insights/health";
+import { FAILURE_RULES, insightsFor } from "../domains/insights/insights";
+import type { Insight } from "../domains/insights/insights";
+import { useWatchEnvironments } from "../domains/live/watch-environment";
+import { projectOverviewQuery, projectUsageQuery } from "../domains/project/overview";
+import type { ProjectOverview, ProjectUsage } from "../domains/project/overview";
+import type { Viewer } from "../domains/project/viewer";
 
 export const Route = createFileRoute("/")({
   loader: async ({ context, parentMatchPromise }) => {

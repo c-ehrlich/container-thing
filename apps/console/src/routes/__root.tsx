@@ -5,12 +5,12 @@ import { getCookie } from "@tanstack/react-start/server";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
-import { ChatPanel } from "../chat/chat-panel";
-import { getRailway, readBackend } from "../railway/backend";
-import { fetchViewer } from "../railway/viewer";
+import { ChatPanel } from "../components/chat/chat-panel";
+import { AppHeader } from "../components/shell/app-header";
+import { AppSidebar } from "../components/shell/app-sidebar";
+import { fetchViewer } from "../domains/project/viewer";
 import type { RouterContext } from "../router";
-import { AppHeader } from "../shell/app-header";
-import { AppSidebar } from "../shell/app-sidebar";
+import { getRailway, readBackend } from "../server/railway/backend";
 
 import css from "../styles.css?url";
 

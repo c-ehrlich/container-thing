@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { clearSession } from "../../server/session";
+import { clearSession } from "../../server/auth/session";
 
 /** POST-only so a stray link or image can't sign the user out. */
 export const Route = createFileRoute("/auth/logout")({
