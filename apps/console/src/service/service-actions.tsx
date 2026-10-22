@@ -3,7 +3,7 @@ import { PlayIcon, RotateCcwIcon, RotateCwIcon, SquareIcon, XIcon } from "lucide
 import { InsightActionButton } from "../overview/insight-action";
 import { ActionButton } from "../railway/action-button";
 import { deploymentState } from "../railway/deployment-state";
-import type { Deployment } from "../railway/project";
+import type { LatestDeployment } from "../railway/overview";
 import { deployServiceFn, deploymentActionFn } from "../railway/project";
 
 type Target = {
@@ -12,7 +12,7 @@ type Target = {
   serviceName: string;
   environmentId: string;
   environmentName: string;
-  deployment: Deployment | null;
+  deployment: LatestDeployment | null;
 };
 
 /**

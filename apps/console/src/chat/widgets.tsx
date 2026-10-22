@@ -14,18 +14,19 @@ import { Link } from "@tanstack/react-router";
 import { CircleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { useWatchEnvironment } from "../railway/live/watch-environment";
-import { projectQuery } from "../railway/project";
-import type { Service } from "../railway/project";
+import { useWatchEnvironments } from "../railway/live/watch-environment";
+import { projectOverviewQuery } from "../railway/overview";
+import type { OverviewService } from "../railway/overview";
 import { ServiceStatusBadge } from "../railway/service-status-badge";
 
 /**
- * Chat widgets get IDs from the tool call and everything else from `projectQuery`, the cache entry the
- * project page uses too. Watching the environment keeps it live even when the page isn't open.
+ * Chat widgets get IDs from the tool call and everything else from `projectOverviewQuery`, the cache
+ * entry the pages use too. Watching the environment keeps it live even when no page shows it; when one
+ * does, they share the same watch.
  */
 function useEnvironment(projectId: string, environmentId: string) {
-  useWatchEnvironment(projectId, environmentId);
-  const { data: project, isPending, error } = useQuery(projectQuery(projectId));
+  useWatchEnvironments([{ projectId, environmentIds: [environmentId] }]);
+  const { data: project, isPending, error } = useQuery(projectOverviewQuery(projectId));
   return {
     project,
     environment: project?.environments.find((e) => e.id === environmentId),
@@ -88,7 +89,7 @@ export function ServiceListWidget(props: { projectId: string; environmentId: str
 }
 
 function ServiceSummary(props: {
-  service: Service;
+  service: OverviewService;
   context: string | undefined;
   projectId: string;
   environmentId: string;

@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
 
 import { deploymentState } from "./deployment-state";
 import type { DeploymentState } from "./deployment-state";
-import type { Deployment } from "./project";
+import type { LatestDeployment } from "./overview";
 
 /** Color only where it matters: green when up, yellow on its way, red when broken. Off is gray. */
 const BADGE_VARIANT = {
@@ -17,7 +17,7 @@ const BADGE_VARIANT = {
 } as const satisfies Record<DeploymentState["kind"], string>;
 
 /** A service's status as shown everywhere in the app: project page and chat widgets alike. */
-export function ServiceStatusBadge(props: { deployment: Deployment | null }) {
+export function ServiceStatusBadge(props: { deployment: LatestDeployment | null }) {
   const { deployment } = props;
   const state = deploymentState(deployment);
   return (
@@ -37,7 +37,7 @@ export function ServiceStatusBadge(props: { deployment: Deployment | null }) {
  * deployment being removed was created when it was deployed, maybe hours ago, so stopping counts
  * from its last status change instead, or not at all if Railway didn't say.
  */
-function pendingSince(deployment: Deployment): string | undefined {
+function pendingSince(deployment: LatestDeployment): string | undefined {
   if (deployment.status !== "REMOVING") return deployment.createdAt;
   return deployment.statusUpdatedAt ?? undefined;
 }

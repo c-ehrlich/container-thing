@@ -14,11 +14,11 @@ import { Spinner } from "@repo/ui/primitives/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { projectQuery } from "./project";
+import { projectScope } from "./query-keys";
 
 /**
  * A button for one Railway call. Afterwards the project is refetched everywhere it's shown: the
- * overview, project and service queries all live under `projectQuery`'s key. With `confirm`, it asks
+ * overview and service queries all live under `projectScope`. With `confirm`, it asks
  * first, for calls that can't be undone.
  */
 export function ActionButton(props: {
@@ -37,7 +37,9 @@ export function ActionButton(props: {
   const mutation = useMutation({
     mutationFn: props.run,
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: projectQuery(props.projectId).queryKey }),
+      queryClient.invalidateQueries({
+        queryKey: projectScope(props.projectId),
+      }),
   });
 
   const button = {

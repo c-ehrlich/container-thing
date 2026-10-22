@@ -3,11 +3,12 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@repo/
 import { Spinner } from "@repo/ui/primitives/spinner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { isDataUIPart } from "ai";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { Streamdown } from "streamdown";
 
-import { projectQuery } from "../railway/project";
+import { projectScope } from "../railway/query-keys";
 import type { ChatMessage } from "./tools";
 import { ServiceListWidget, ServiceWidget, WidgetCard, WidgetError } from "./widgets";
 
@@ -18,6 +19,9 @@ export type ApprovalHandler = (approvalId: string, approved: boolean) => void;
 
 export function MessagePart(props: { part: Part; onApproval: ApprovalHandler }) {
   const { part, onApproval } = props;
+  // `data-*` parts have template-literal types that a `case` can't rule out, and the chat sends none.
+  if (isDataUIPart(part)) return null;
+
   switch (part.type) {
     case "text":
       return <Streamdown className="text-sm">{part.text}</Streamdown>;
@@ -29,7 +33,18 @@ export function MessagePart(props: { part: Part; onApproval: ApprovalHandler }) 
       return <StartServicePart part={part} />;
     case "tool-stopService":
       return <StopServicePart part={part} onApproval={onApproval} />;
+    case "reasoning":
+    case "reasoning-file":
+    case "source-url":
+    case "source-document":
+    case "file":
+    case "step-start":
+    case "dynamic-tool":
+    case "custom":
+      return null;
     default:
+      // type error if there are unhandled cases
+      part satisfies never;
       return null;
   }
 }
@@ -68,8 +83,11 @@ function ListProjectsPart(props: { part: ToolPart<"listProjects"> }) {
     case "output-denied":
       // Project lookups do not require approval.
       return null;
+    default:
+      // type error if there are unhandled cases
+      part satisfies never;
+      return null;
   }
-  return null;
 }
 
 function ListServicesPart(props: { part: ToolPart<"listServices"> }) {
@@ -92,8 +110,11 @@ function ListServicesPart(props: { part: ToolPart<"listServices"> }) {
     case "output-denied":
       // Service lookups do not require approval.
       return null;
+    default:
+      // type error if there are unhandled cases
+      part satisfies never;
+      return null;
   }
-  return null;
 }
 
 function StartServicePart(props: { part: ToolPart<"startService"> }) {
@@ -125,8 +146,11 @@ function StartServicePart(props: { part: ToolPart<"startService"> }) {
     case "output-denied":
       // Starting a service does not require approval.
       return null;
+    default:
+      // type error if there are unhandled cases
+      part satisfies never;
+      return null;
   }
-  return null;
 }
 
 function StopServicePart(props: { part: ToolPart<"stopService">; onApproval: ApprovalHandler }) {
@@ -176,8 +200,11 @@ function StopServicePart(props: { part: ToolPart<"stopService">; onApproval: App
           <ServiceWidget {...part.input} />
         </div>
       );
+    default:
+      // type error if there are unhandled cases
+      part satisfies never;
+      return null;
   }
-  return null;
 }
 
 /**
@@ -188,7 +215,7 @@ function useRefreshProjectWhen(done: boolean, projectId: string | undefined) {
   const queryClient = useQueryClient();
   useEffect(() => {
     if (done && projectId) {
-      void queryClient.invalidateQueries({ queryKey: projectQuery(projectId).queryKey });
+      void queryClient.invalidateQueries({ queryKey: projectScope(projectId) });
     }
   }, [done, projectId, queryClient]);
 }

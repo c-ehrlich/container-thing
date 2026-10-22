@@ -1,4 +1,3 @@
-import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -11,6 +10,7 @@ const ProjectQuery = graphql(`
     project(id: $id) {
       id
       name
+      primaryEnvironmentId
       environments {
         edges {
           node {
@@ -41,12 +41,17 @@ const ProjectQuery = graphql(`
   }
 `);
 
-/** A project with its environments and their services, flattened from Railway's connection types. */
+/**
+ * A project with its environments and their services, flattened from Railway's connection types.
+ * Lighter than `fetchProjectOverview`, for the chat's tools, which only need names and statuses. The
+ * browser always reads `projectOverviewQuery`.
+ */
 export async function fetchProject(railway: RailwayClient, projectId: string) {
   const { project } = await railway(ProjectQuery, { id: projectId });
   return {
     id: project.id,
     name: project.name,
+    primaryEnvironmentId: project.primaryEnvironmentId,
     environments: project.environments.edges.map(({ node: environment }) => ({
       id: environment.id,
       name: environment.name,
@@ -58,20 +63,6 @@ export async function fetchProject(railway: RailwayClient, projectId: string) {
       })),
     })),
   };
-}
-
-export type Project = Awaited<ReturnType<typeof fetchProject>>;
-export type Environment = Project["environments"][number];
-export type Service = Environment["services"][number];
-export type Deployment = NonNullable<Service["deployment"]>;
-
-/** The requested environment, else `production`, else the first one. */
-export function pickEnvironment(project: Project, environmentId?: string): Environment | undefined {
-  return (
-    project.environments.find((e) => e.id === environmentId) ??
-    project.environments.find((e) => e.name === "production") ??
-    project.environments[0]
-  );
 }
 
 const DeployMutation = graphql(`
@@ -176,11 +167,6 @@ export async function createService(railway: RailwayClient, input: z.infer<typeo
   return serviceCreate.id;
 }
 
-const getProjectFn = createServerFn({ method: "GET" })
-  .middleware([requireRailway])
-  .validator(z.object({ projectId: z.string() }))
-  .handler(({ data, context }) => fetchProject(context.railway, data.projectId));
-
 export const deployServiceFn = createServerFn({ method: "POST" })
   .middleware([requireRailway])
   .validator(z.object({ serviceId: z.string(), environmentId: z.string() }))
@@ -192,16 +178,6 @@ export const createServiceFn = createServerFn({ method: "POST" })
   .middleware([requireRailway])
   .validator(NewService)
   .handler(({ data, context }) => createService(context.railway, data));
-
-/**
- * The one cache entry for a project's services and deployments. The project page and the chat widgets
- * both read it, and `useWatchEnvironment` keeps it live, so they always show the same state.
- */
-export const projectQuery = (projectId: string) =>
-  queryOptions({
-    queryKey: ["project", projectId],
-    queryFn: () => getProjectFn({ data: { projectId } }),
-  });
 
 const DEPLOYMENT_MUTATIONS = {
   /** Restarts the container as it is, without building again. */

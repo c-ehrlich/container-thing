@@ -6,12 +6,13 @@ import { ArrowUpRightIcon, CircleCheckIcon } from "lucide-react";
 import { AddServiceDialog } from "../../../add-service/add-service-dialog";
 import { useDismissed } from "../../../overview/dismissed";
 import { DotGrid } from "../../../overview/dot-grid";
-import { KIND_DOT, healthOf, primaryEnvironment, verdictOf } from "../../../overview/health";
+import { KIND_DOT, healthOf, verdictOf } from "../../../overview/health";
 import { insightsFor } from "../../../overview/insights";
 import { InsightItem } from "../../../overview/insights-panel";
 import { MonthlyCost } from "../../../overview/monthly-cost";
 import { TopologyDiagram } from "../../../overview/topology-diagram";
 import { ServiceTable } from "../../../project/service-table";
+import { pickEnvironment } from "../../../railway/environments";
 import { projectOverviewQuery, projectUsageQuery } from "../../../railway/overview";
 
 export const Route = createFileRoute("/projects/$projectId/")({
@@ -34,8 +35,7 @@ function ProjectPage() {
   const { data: usage } = useQuery(projectUsageQuery(projectId));
   const dismissed = useDismissed(initiallyDismissed);
 
-  const environment =
-    project.environments.find((e) => e.id === environmentId) ?? primaryEnvironment(project);
+  const environment = pickEnvironment(project, environmentId);
   const workspace = viewer?.workspaces.find((w) => w.projects.some((p) => p.id === projectId));
   const insights = insightsFor([{ project, usage }]);
   const shown = insights.filter(

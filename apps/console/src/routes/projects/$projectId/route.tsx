@@ -3,7 +3,7 @@ import { Outlet, createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { getDismissedFn } from "../../../overview/dismissed";
-import { useWatchOverview } from "../../../railway/live/watch-environment";
+import { useWatchEnvironments } from "../../../railway/live/watch-environment";
 import { projectOverviewQuery } from "../../../railway/overview";
 
 /**
@@ -22,6 +22,6 @@ export const Route = createFileRoute("/projects/$projectId")({
 function ProjectLayout() {
   const { projectId } = Route.useParams();
   const { data: project } = useSuspenseQuery(projectOverviewQuery(projectId));
-  useWatchOverview([{ projectId, environmentIds: project.environments.map((e) => e.id) }]);
+  useWatchEnvironments([{ projectId, environmentIds: project.environments.map((e) => e.id) }]);
   return <Outlet />;
 }

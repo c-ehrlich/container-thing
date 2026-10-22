@@ -3,7 +3,8 @@ import type { InferUITools, UIDataTypes, UIMessage } from "ai";
 import { z } from "zod";
 
 import { deploymentState } from "../railway/deployment-state";
-import { deployService, fetchProject, pickEnvironment, stopService } from "../railway/project";
+import { pickEnvironment } from "../railway/environments";
+import { deployService, fetchProject, stopService } from "../railway/project";
 import type { RailwayClient } from "../railway/railway-api";
 import { fetchViewer } from "../railway/viewer";
 

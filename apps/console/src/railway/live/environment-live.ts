@@ -1,10 +1,12 @@
 import { QueryObserver } from "@tanstack/react-query";
-import type { QueryClient, QueryKey, QueryObserverOptions } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { deploymentState } from "../deployment-state";
 import { graphql } from "../graphql/graphql";
-import { projectQuery } from "../project";
-import type { Project } from "../project";
+import { projectOverviewQuery } from "../overview";
+import type { ProjectOverview } from "../overview";
+import { projectScope } from "../query-keys";
 import {
   getLiveConnection,
   onLiveConnectionChange,
@@ -59,50 +61,25 @@ export interface LiveStatus {
 }
 
 /**
- * The query a screen shows for a project, observed while the environment is watched: observing keeps
- * it active (so invalidations refetch it), lets it poll, and reports which deployments it shows, so
- * their status pushes can refetch it too. The project page watches `projectQuery`; the overview
- * watches its own.
+ * Deploys in flight in one environment. Railway's canvas pushes already cover every other change, so
+ * only these also get their own status subscription.
  */
-export type LiveTarget = (
-  queryClient: QueryClient,
-  environmentId: string,
-  onDeployments: (ids: string[]) => void,
-) => { setPolling: (intervalMs: number | false) => void; stop: () => void };
-
-/** A `LiveTarget` for `query`, given how to find an environment's deployments in its data. */
-export function liveTarget<TData, TKey extends QueryKey>(
-  query: QueryObserverOptions<TData, Error, TData, TData, TKey>,
-  deploymentIds: (data: TData, environmentId: string) => string[],
-): LiveTarget {
-  return (queryClient, environmentId, onDeployments) => {
-    const observer = new QueryObserver(queryClient, query);
-    const report = (data: TData | undefined) =>
-      onDeployments(data === undefined ? [] : deploymentIds(data, environmentId));
-    const unsubscribe = observer.subscribe((result) => report(result.data));
-    report(observer.getCurrentResult().data);
-    return {
-      setPolling: (intervalMs) => observer.setOptions({ ...query, refetchInterval: intervalMs }),
-      stop: unsubscribe,
-    };
-  };
-}
-
-export const projectTarget = (projectId: string) =>
-  liveTarget(
-    projectQuery(projectId),
-    (data: Project, environmentId) =>
-      data.environments
-        .find((e) => e.id === environmentId)
-        ?.services.flatMap((s) => (s.deployment ? [s.deployment.id] : [])) ?? [],
+function deploysInFlight(project: ProjectOverview | undefined, environmentId: string): string[] {
+  return (
+    project?.environments
+      .find((e) => e.id === environmentId)
+      ?.services.flatMap((s) =>
+        s.deployment && deploymentState(s.deployment).kind === "pending" ? [s.deployment.id] : [],
+      ) ?? []
   );
+}
 
 /**
  * Keeps a project's queries fresh for one environment until the returned function is called.
  * We only use subscriptions to trigger refetches, not yet as basically event sourcing
  *
  * - `canvasInvalidation` catches changes made anywhere (dashboard, CLI, git push).
- * - `deployment(id)` catches status changes of the deployments currently shown.
+ * - `deployment(id)` catches status changes of the deploys in flight.
  * - While that isn't available (`canvasInvalidation` errored or silent for 30 s, connection down), the query polls
  *   instead.
  */
@@ -110,16 +87,15 @@ export function keepEnvironmentLive(
   queryClient: QueryClient,
   projectId: string,
   environmentId: string,
-  target: LiveTarget,
   onStatus: (status: LiveStatus) => void,
 ): () => void {
   let refetchTimer: ReturnType<typeof setTimeout> | undefined;
   const scheduleRefetch = () => {
     clearTimeout(refetchTimer);
     refetchTimer = setTimeout(() => {
-      // Every query about the project is keyed under `projectQuery`'s key (the overview's too), so
-      // a change refetches whichever of them is on screen.
-      void queryClient.invalidateQueries({ queryKey: projectQuery(projectId).queryKey });
+      // Every query about the project is keyed under `projectScope`, so a change refetches
+      // whichever of them is on screen.
+      void queryClient.invalidateQueries({ queryKey: projectScope(projectId) });
     }, REFETCH_DEBOUNCE_MS);
   };
 
@@ -139,7 +115,14 @@ export function keepEnvironmentLive(
       );
     }
   };
-  const observed = target(queryClient, environmentId, syncDeployments);
+  // Observing the project's query keeps it active (so invalidations refetch it), lets it poll, and
+  // says which deploys are in flight.
+  const query = projectOverviewQuery(projectId);
+  const observer = new QueryObserver(queryClient, query);
+  const unsubscribeObserver = observer.subscribe((result) =>
+    syncDeployments(deploysInFlight(result.data, environmentId)),
+  );
+  syncDeployments(deploysInFlight(observer.getCurrentResult().data, environmentId));
 
   let canvasAvailable = true;
   let status: LiveStatus | undefined;
@@ -148,7 +131,10 @@ export function keepEnvironmentLive(
     const mode: LiveMode = canvasAvailable && connection === "connected" ? "live" : "polling";
     if (status?.mode === mode && status.connection === connection) return;
     if (status?.mode !== mode) {
-      observed.setPolling(mode === "polling" ? POLL_INTERVAL_MS : false);
+      observer.setOptions({
+        ...query,
+        refetchInterval: mode === "polling" ? POLL_INTERVAL_MS : query.refetchInterval,
+      });
     }
     status = { mode, connection };
     onStatus(status);
@@ -198,7 +184,7 @@ export function keepEnvironmentLive(
     clearInterval(watchdog);
     unsubscribeCanvas();
     for (const unsubscribe of deployments.values()) unsubscribe();
-    observed.stop();
+    unsubscribeObserver();
     unsubscribeConnection();
     unsubscribeReconnected();
   };

@@ -5,9 +5,10 @@ import { GlobeIcon } from "lucide-react";
 import { useState } from "react";
 
 import { AddServiceDialog } from "../add-service/add-service-dialog";
+import { primaryEnvironment } from "../railway/environments";
 import type { ProjectOverview, ProjectUsage } from "../railway/overview";
 import { DotGrid } from "./dot-grid";
-import { KIND_DOT, KIND_TEXT, healthOf, primaryEnvironment, servicesOf, verdictOf } from "./health";
+import { KIND_DOT, KIND_TEXT, healthOf, servicesOf, verdictOf } from "./health";
 import { MonthlyCost } from "./monthly-cost";
 import { TopologyDiagram } from "./topology-diagram";
 

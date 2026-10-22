@@ -12,7 +12,7 @@ import type { Insight } from "../overview/insights";
 import { InsightsPanel } from "../overview/insights-panel";
 import { NeedsYouCard } from "../overview/needs-you-card";
 import { ProjectCard } from "../overview/project-card";
-import { useWatchOverview } from "../railway/live/watch-environment";
+import { useWatchEnvironments } from "../railway/live/watch-environment";
 import { projectOverviewQuery, projectUsageQuery } from "../railway/overview";
 import type { ProjectOverview, ProjectUsage } from "../railway/overview";
 import type { Viewer } from "../railway/viewer";
@@ -82,7 +82,7 @@ function Overview(props: { viewer: Viewer }) {
   });
   // Railway's live pushes refetch a project's overview when anything changes in it: a deploy from the
   // chat, the dashboard, the CLI or a git push.
-  useWatchOverview(
+  useWatchEnvironments(
     loaded.map(({ project }) => ({
       projectId: project.id,
       environmentIds: project.environments.map((e) => e.id),

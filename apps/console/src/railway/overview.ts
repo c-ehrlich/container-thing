@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { deploymentState } from "./deployment-state";
 import { graphql } from "./graphql/graphql";
-import { liveTarget } from "./live/environment-live";
+import { projectScope } from "./query-keys";
 import type { RailwayClient } from "./railway-api";
 import { referencedServices } from "./references";
 import { requireRailway } from "./require-railway";
@@ -154,6 +154,9 @@ export async function fetchProjectOverview(railway: RailwayClient, projectId: st
 export type ProjectOverview = Awaited<ReturnType<typeof fetchProjectOverview>>;
 export type OverviewEnvironment = ProjectOverview["environments"][number];
 export type OverviewService = OverviewEnvironment["services"][number];
+/** A service's latest deployment, which says what state it's in. */
+export type LatestDeployment = NonNullable<OverviewService["deployment"]>;
+/** One of the project's recent deploys, which the insights are built from. */
 export type OverviewDeployment = ProjectOverview["deployments"][number];
 
 const ProjectMetricsQuery = graphql(`
@@ -275,14 +278,15 @@ const getProjectUsageFn = createServerFn({ method: "GET" })
   .handler(({ data, context }) => fetchProjectUsage(context.railway, data.projectId));
 
 /**
- * Keyed under `projectQuery`'s key, so anything that refreshes a project (the chat after a tool call,
- * Railway's live pushes) refreshes its overview too. Railway allows as few as 1000 requests an hour
+ * The one cache entry for a project's environments, services and deployments: every page and the chat
+ * widgets read it, so they always agree. Keyed under `projectScope`, so anything that refreshes a
+ * project (an action, the chat after a tool call, Railway's live pushes) refreshes it. Railway allows as few as 1000 requests an hour
  * (Hobby) and the overview asks once per project, so beyond that it only refetches when you come back
  * to the tab, and every few seconds while a deploy is in flight.
  */
 export const projectOverviewQuery = (projectId: string) =>
   queryOptions({
-    queryKey: ["project", projectId, "overview"],
+    queryKey: [...projectScope(projectId), "overview"],
     queryFn: () => getProjectOverviewFn({ data: { projectId } }),
     staleTime: 30_000,
     refetchInterval: (query) =>
@@ -300,18 +304,3 @@ export const projectUsageQuery = (projectId: string) =>
     queryFn: () => getProjectUsageFn({ data: { projectId } }),
     staleTime: 10 * 60_000,
   });
-
-/**
- * What the overview keeps live per environment (see `keepEnvironmentLive`). Railway's canvas pushes
- * already cover every change, so only deploys in flight also get their own status subscription.
- */
-export const overviewTarget = (projectId: string) =>
-  liveTarget(
-    projectOverviewQuery(projectId),
-    (data: ProjectOverview, environmentId) =>
-      data.environments
-        .find((e) => e.id === environmentId)
-        ?.services.flatMap((s) =>
-          s.deployment && deploymentState(s.deployment).kind === "pending" ? [s.deployment.id] : [],
-        ) ?? [],
-  );

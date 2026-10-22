@@ -18,7 +18,8 @@ import { useRef, useState } from "react";
 import { z } from "zod";
 
 import { IMAGE_REF, imageBaseName, parseImageRef } from "../docker/image-ref";
-import { createServiceFn, projectQuery } from "../railway/project";
+import { createServiceFn } from "../railway/project";
+import { projectScope } from "../railway/query-keys";
 import { templateSuggestionQuery } from "../railway/templates";
 import type { SuggestedVariable, TemplateSuggestion } from "../railway/templates";
 import { ImageField } from "./image-field";
@@ -145,7 +146,7 @@ function AddServiceSteps(props: {
   const create = useMutation({
     mutationFn: createServiceFn,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: projectQuery(projectId).queryKey });
+      await queryClient.invalidateQueries({ queryKey: projectScope(projectId) });
       onCreated();
     },
   });

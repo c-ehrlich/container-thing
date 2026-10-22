@@ -6,10 +6,11 @@ import { GlobeIcon } from "lucide-react";
 import { useState } from "react";
 
 import { useDismissed } from "../../../../overview/dismissed";
-import { KIND_DOT, primaryEnvironment, timeAgo } from "../../../../overview/health";
+import { KIND_DOT, timeAgo } from "../../../../overview/health";
 import { insightsFor } from "../../../../overview/insights";
 import { InsightItem } from "../../../../overview/insights-panel";
 import { deploymentState } from "../../../../railway/deployment-state";
+import { primaryEnvironment } from "../../../../railway/environments";
 import { projectOverviewQuery } from "../../../../railway/overview";
 import type { ProjectOverview } from "../../../../railway/overview";
 import { serviceQuery } from "../../../../railway/service";

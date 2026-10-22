@@ -1,5 +1,6 @@
+import { primaryEnvironment } from "../railway/environments";
 import type { OverviewDeployment, ProjectOverview, ProjectUsage } from "../railway/overview";
-import { listOf, primaryEnvironment, servicesOf, timeAgo } from "./health";
+import { listOf, servicesOf, timeAgo } from "./health";
 import type { ServiceWithState } from "./health";
 
 /**

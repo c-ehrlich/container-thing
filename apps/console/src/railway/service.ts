@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { graphql } from "./graphql/graphql";
-import { projectQuery } from "./project";
+import { projectScope } from "./query-keys";
 import type { RailwayClient } from "./railway-api";
 import { requireRailway } from "./require-railway";
 import { deploymentMeta, domainsOf, oneDayAgo, sourceOf } from "./service-fields";
@@ -187,12 +187,7 @@ const getLogsFn = createServerFn({ method: "GET" })
  */
 export const serviceQuery = (input: z.infer<typeof ServiceInput>) =>
   queryOptions({
-    queryKey: [
-      ...projectQuery(input.projectId).queryKey,
-      "service",
-      input.environmentId,
-      input.serviceId,
-    ],
+    queryKey: [...projectScope(input.projectId), "service", input.environmentId, input.serviceId],
     queryFn: () => getServiceFn({ data: input }),
     staleTime: 30_000,
   });

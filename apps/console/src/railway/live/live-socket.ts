@@ -190,6 +190,9 @@ export default defineWebSocketHandler({
         connection.subscriptions.set(id, unsubscribe);
         return;
       }
+      default:
+        // type error if there are unhandled cases
+        message satisfies never;
     }
   },
 

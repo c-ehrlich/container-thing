@@ -37,15 +37,6 @@ export type ServiceWithState = OverviewService & {
   state: DeploymentState;
 };
 
-/** Railway's primary environment (the oldest non-ephemeral one), else `production`, else the first. */
-export function primaryEnvironment(project: ProjectOverview): OverviewEnvironment | undefined {
-  return (
-    project.environments.find((e) => e.id === project.primaryEnvironmentId) ??
-    project.environments.find((e) => e.name === "production") ??
-    project.environments[0]
-  );
-}
-
 /** Services of one environment, or of all of them, with what their latest deployment means. */
 export function servicesOf(
   project: ProjectOverview,
