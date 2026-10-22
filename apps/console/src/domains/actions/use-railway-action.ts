@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { projectScope } from "../project/overview";
+import { projectScope } from "../project/project";
 import { runActionFn } from "./actions";
 import type { RailwayAction } from "./actions";
 

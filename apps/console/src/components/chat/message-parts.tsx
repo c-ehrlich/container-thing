@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { Streamdown } from "streamdown";
 
 import type { ChatMessage } from "../../domains/assistant/tools";
-import { projectScope } from "../../domains/project/overview";
+import { projectScope } from "../../domains/project/project";
 import { ServiceListWidget, ServiceWidget, WidgetCard, WidgetError } from "./widgets";
 
 type Part = ChatMessage["parts"][number];

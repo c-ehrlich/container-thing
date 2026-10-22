@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { OverviewDeployment, ProjectOverview } from "../project/overview";
+import type { ProjectDeployment, Project } from "../project/project";
 import { referencedServices } from "../project/references";
 import { servicesOf } from "./health";
 import { dependentsOf, insightsFor } from "./insights";
@@ -8,12 +8,12 @@ import { dependentsOf, insightsFor } from "./insights";
 const NOW = Date.parse("2026-10-21T12:00:00Z");
 const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
 
-type Status = OverviewDeployment["status"];
+type Status = ProjectDeployment["status"];
 
 /** A one-environment project: `web → api → postgres`, with the given deploy history per service. */
-function project(history: Record<string, [Status, number, string?][]>): ProjectOverview {
+function project(history: Record<string, [Status, number, string?][]>): Project {
   const names = ["web", "api", "postgres"];
-  const deployments: OverviewDeployment[] = names.flatMap((name) =>
+  const deployments: ProjectDeployment[] = names.flatMap((name) =>
     (history[name] ?? [["SUCCESS", 3 * 24 * 60]]).map(([status, ago, commitMessage], i) => ({
       id: `${name}-${i}`,
       status,
@@ -64,10 +64,10 @@ function project(history: Record<string, [Status, number, string?][]>): ProjectO
   };
 }
 
-const only = (p: ProjectOverview) => insightsFor([{ project: p }], NOW);
+const only = (p: Project) => insightsFor([{ project: p }], NOW);
 
 /** `postgres` after Stop: Railway removed its deployments, so it reports no latest one. */
-function stopped(p: ProjectOverview): ProjectOverview {
+function stopped(p: Project): Project {
   for (const environment of p.environments) {
     for (const service of environment.services) {
       if (service.name === "postgres") service.deployment = null;

@@ -1,11 +1,12 @@
 import type { RailwayAction } from "../actions";
 import { primaryEnvironment } from "../project/environments";
-import type { OverviewDeployment, ProjectOverview, ProjectUsage } from "../project/overview";
+import type { ProjectDeployment, Project } from "../project/project";
+import type { ProjectUsage } from "../project/usage";
 import { listOf, servicesOf, timeAgo } from "./health";
 import type { ServiceWithState } from "./health";
 
 /**
- * Turns the overview's data into a short list of things worth doing, each with the button that does
+ * Turns projects' data into a short list of things worth doing, each with the button that does
  * it. Plain rules, no model: everything an insight says comes from the project, its recent deploys
  * and its CPU, so it can't make things up.
  */
@@ -24,7 +25,7 @@ export type Insight = {
   key: string;
   rule: InsightRule;
   severity: "critical" | "warning" | "info";
-  project: ProjectOverview;
+  project: Project;
   /** Set for insights about one service; failures show as a card with the project's diagram. */
   service?: ServiceWithState;
   headline: string;
@@ -70,7 +71,7 @@ const RECENT_DEPLOY = HOUR;
 const SPIKE_RATIO = 1.6;
 
 export function insightsFor(
-  projects: { project: ProjectOverview; usage?: ProjectUsage }[],
+  projects: { project: Project; usage?: ProjectUsage }[],
   now = Date.now(),
 ): Insight[] {
   return projects
@@ -105,7 +106,7 @@ export function dependentsOf(service: ServiceWithState): string[] {
 }
 
 /** Railway's page for a service, where its logs are. */
-function railwayUrl(project: ProjectOverview, service: ServiceWithState, deploymentId?: string) {
+function railwayUrl(project: Project, service: ServiceWithState, deploymentId?: string) {
   const url = new URL(`https://railway.com/project/${project.id}/service/${service.id}`);
   url.searchParams.set("environmentId", service.environment.id);
   if (deploymentId) url.searchParams.set("id", deploymentId);
@@ -113,21 +114,21 @@ function railwayUrl(project: ProjectOverview, service: ServiceWithState, deploym
 }
 
 /** The service's recent deploys in its environment, newest first. */
-function historyOf(project: ProjectOverview, service: ServiceWithState) {
+function historyOf(project: Project, service: ServiceWithState) {
   return project.deployments
     .filter((d) => d.serviceId === service.id && d.environmentId === service.environment.id)
     .toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
-const isFailure = (d: OverviewDeployment) => d.status === "FAILED" || d.status === "CRASHED";
+const isFailure = (d: ProjectDeployment) => d.status === "FAILED" || d.status === "CRASHED";
 
-function serviceInsights(project: ProjectOverview, service: ServiceWithState, now: number) {
+function serviceInsights(project: Project, service: ServiceWithState, now: number) {
   if (service.state.kind === "failed") return [failureInsight(project, service, now)];
   if (service.state.kind === "pending") return stuckDeploy(project, service, now);
   return housekeeping(project, service, now);
 }
 
-function failureInsight(project: ProjectOverview, service: ServiceWithState, now: number): Insight {
+function failureInsight(project: Project, service: ServiceWithState, now: number): Insight {
   const history = historyOf(project, service);
   const streakEnd = history.findIndex((d) => !isFailure(d));
   const failures = streakEnd === -1 ? history : history.slice(0, streakEnd);
@@ -237,7 +238,7 @@ function failureInsight(project: ProjectOverview, service: ServiceWithState, now
   };
 }
 
-function stuckDeploy(project: ProjectOverview, service: ServiceWithState, now: number): Insight[] {
+function stuckDeploy(project: Project, service: ServiceWithState, now: number): Insight[] {
   const deployment = service.deployment;
   if (!deployment || service.state.label !== "Deploying") return [];
   const elapsed = now - Date.parse(deployment.createdAt);
@@ -263,7 +264,7 @@ function stuckDeploy(project: ProjectOverview, service: ServiceWithState, now: n
 }
 
 /** Services that were added and never deployed, or switched off long ago. */
-function housekeeping(project: ProjectOverview, service: ServiceWithState, now: number): Insight[] {
+function housekeeping(project: Project, service: ServiceWithState, now: number): Insight[] {
   const deploy = {
     kind: "deploy" as const,
     serviceId: service.id,
@@ -321,7 +322,7 @@ function median(values: number[]) {
 }
 
 /** The last 3 hours of CPU against the day's median. */
-function cpuSpike(project: ProjectOverview, usage: ProjectUsage): Insight[] {
+function cpuSpike(project: Project, usage: ProjectUsage): Insight[] {
   const baseline = median(usage.cpu);
   const recent = usage.cpu.slice(-(3 * HOUR) / (usage.sampleSeconds * 1000));
   if (baseline < 0.05 || recent.length === 0) return [];
@@ -345,7 +346,7 @@ function cpuSpike(project: ProjectOverview, usage: ProjectUsage): Insight[] {
 }
 
 /** Environments other than the primary where nothing has run for a day: previews nobody closed. */
-function idleEnvironments(project: ProjectOverview, now: number): Insight[] {
+function idleEnvironments(project: Project, now: number): Insight[] {
   const primary = primaryEnvironment(project);
   return project.environments
     .filter((environment) => environment.id !== primary?.id && environment.services.length > 0)

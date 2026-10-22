@@ -4,16 +4,16 @@ import { z } from "zod";
 
 import { getDismissedFn } from "../../../domains/insights/dismissed";
 import { useWatchEnvironments } from "../../../domains/live";
-import { projectOverviewQuery } from "../../../domains/project/overview";
+import { projectQuery } from "../../../domains/project/project";
 
 /**
- * A project and its services. Both the project page and a service's page read the project's
- * overview, kept live here for as long as either is open.
+ * A project and its services. Both the project page and a service's page read `projectQuery`, kept
+ * live here for as long as either is open.
  */
 export const Route = createFileRoute("/projects/$projectId")({
   validateSearch: z.object({ environmentId: z.string().optional() }),
   loader: async ({ context, params }) => {
-    await context.queryClient.ensureQueryData(projectOverviewQuery(params.projectId));
+    await context.queryClient.ensureQueryData(projectQuery(params.projectId));
     return { dismissed: await getDismissedFn() };
   },
   component: ProjectLayout,
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/projects/$projectId")({
 
 function ProjectLayout() {
   const { projectId } = Route.useParams();
-  const { data: project } = useSuspenseQuery(projectOverviewQuery(projectId));
+  const { data: project } = useSuspenseQuery(projectQuery(projectId));
   useWatchEnvironments([{ projectId, environmentIds: project.environments.map((e) => e.id) }]);
   return <Outlet />;
 }

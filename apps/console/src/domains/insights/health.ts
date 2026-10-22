@@ -1,6 +1,6 @@
 import { deploymentState } from "../project/deployment-state";
 import type { DeploymentState } from "../project/deployment-state";
-import type { OverviewEnvironment, OverviewService, ProjectOverview } from "../project/overview";
+import type { Environment, Service, Project } from "../project/project";
 
 export type Kind = DeploymentState["kind"];
 
@@ -14,16 +14,13 @@ export function isDatastore(service: { name: string; source: string | null }) {
   return DATASTORE.test((service.source ?? service.name).split(":")[0] ?? "");
 }
 
-export type ServiceWithState = OverviewService & {
-  environment: OverviewEnvironment;
+export type ServiceWithState = Service & {
+  environment: Environment;
   state: DeploymentState;
 };
 
 /** Services of one environment, or of all of them, with what their latest deployment means. */
-export function servicesOf(
-  project: ProjectOverview,
-  environment?: OverviewEnvironment,
-): ServiceWithState[] {
+export function servicesOf(project: Project, environment?: Environment): ServiceWithState[] {
   const environments = environment ? [environment] : project.environments;
   return environments.flatMap((env) =>
     env.services.map((service) => ({
@@ -42,7 +39,7 @@ export type Health = {
   attention: ServiceWithState[];
 };
 
-export function healthOf(project: ProjectOverview, environment?: OverviewEnvironment): Health {
+export function healthOf(project: Project, environment?: Environment): Health {
   const services = servicesOf(project, environment);
   const counts = { running: 0, sleeping: 0, pending: 0, failed: 0, stopped: 0 };
   for (const service of services) counts[service.state.kind]++;

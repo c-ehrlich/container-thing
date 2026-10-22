@@ -5,7 +5,7 @@ import { CircleXIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 
 import { timeAgo } from "../../domains/insights/health";
 import type { Insight } from "../../domains/insights/insights";
-import type { ProjectUsage } from "../../domains/project/overview";
+import type { ProjectUsage } from "../../domains/project/usage";
 import { DotGrid } from "./dot-grid";
 import { InsightButtons } from "./insight-action";
 import { TopologyDiagram } from "./topology-diagram";

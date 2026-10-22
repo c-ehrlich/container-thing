@@ -13,8 +13,10 @@ import { healthOf, timeAgo } from "../domains/insights/health";
 import { FAILURE_RULES, insightsFor } from "../domains/insights/insights";
 import type { Insight } from "../domains/insights/insights";
 import { useWatchEnvironments } from "../domains/live";
-import { projectOverviewQuery, projectUsageQuery } from "../domains/project/overview";
-import type { ProjectOverview, ProjectUsage } from "../domains/project/overview";
+import { projectQuery } from "../domains/project/project";
+import type { Project } from "../domains/project/project";
+import { projectUsageQuery } from "../domains/project/usage";
+import type { ProjectUsage } from "../domains/project/usage";
 import type { Viewer } from "../domains/project/viewer";
 
 export const Route = createFileRoute("/")({
@@ -25,7 +27,7 @@ export const Route = createFileRoute("/")({
     // take the page down, so failures are left to the card. Usage is slow and only decorates the
     // cards, so it loads afterwards in the browser.
     await Promise.allSettled(
-      projects.map((p) => context.queryClient.ensureQueryData(projectOverviewQuery(p.id))),
+      projects.map((p) => context.queryClient.ensureQueryData(projectQuery(p.id))),
     );
     return { dismissed: await getDismissedFn() };
   },
@@ -61,7 +63,7 @@ function Home() {
   return <Overview viewer={viewer} />;
 }
 
-type Loaded = { project: ProjectOverview; usage?: ProjectUsage; workspace: string };
+type Loaded = { project: Project; usage?: ProjectUsage; workspace: string };
 
 /**
  * Triage first: broken services with the fix on the card, then deploys in flight, then every other
@@ -71,7 +73,7 @@ function Overview(props: { viewer: Viewer }) {
   const listed = props.viewer.workspaces.flatMap((workspace) =>
     workspace.projects.map((project) => ({ ...project, workspace: workspace.name })),
   );
-  const overviews = useQueries({ queries: listed.map((p) => projectOverviewQuery(p.id)) });
+  const overviews = useQueries({ queries: listed.map((p) => projectQuery(p.id)) });
   const usages = useQueries({ queries: listed.map((p) => projectUsageQuery(p.id)) });
   const { dismissed: initiallyDismissed } = Route.useLoaderData();
   const dismissed = useDismissed(initiallyDismissed);

@@ -6,7 +6,8 @@ import { useState } from "react";
 
 import { healthOf, servicesOf, verdictOf } from "../../domains/insights/health";
 import { primaryEnvironment } from "../../domains/project/environments";
-import type { ProjectOverview, ProjectUsage } from "../../domains/project/overview";
+import type { Project } from "../../domains/project/project";
+import type { ProjectUsage } from "../../domains/project/usage";
 import { AddServiceDialog } from "../add-service/add-service-dialog";
 import { KIND_DOT, KIND_TEXT } from "../status-colors";
 import { DotGrid } from "./dot-grid";
@@ -17,7 +18,7 @@ import { TopologyDiagram } from "./topology-diagram";
  * A project as a card whose thumbnail is its architecture. Switching environments redraws the diagram;
  * the rest of the card opens the project in that environment.
  */
-export function ProjectCard(props: { project: ProjectOverview; usage?: ProjectUsage }) {
+export function ProjectCard(props: { project: Project; usage?: ProjectUsage }) {
   const { project, usage } = props;
   const [environmentId, setEnvironmentId] = useState(primaryEnvironment(project)?.id);
   const environment = project.environments.find((e) => e.id === environmentId);

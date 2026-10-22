@@ -9,9 +9,9 @@ import {
 } from "../../domains/actions/actions";
 import { findTemplateSuggestion } from "../../domains/add-service/templates";
 import { insightsFor } from "../../domains/insights/insights";
-import { fetchProjectOverview, fetchProjectUsage } from "../../domains/project/overview";
 import { fetchProject } from "../../domains/project/project";
 import { fetchLogs, fetchService } from "../../domains/project/service";
+import { fetchProjectUsage } from "../../domains/project/usage";
 import { fetchViewer } from "../../domains/project/viewer";
 import schema from "../../lib/graphql/railway-schema.graphql?raw";
 import { createMockRailwayClient } from "./mock-railway";
@@ -49,7 +49,7 @@ async function loadAll() {
   const projects = viewer.workspaces.flatMap((w) => w.projects);
   return Promise.all(
     projects.map(async (p) => ({
-      project: await fetchProjectOverview(railway, p.id),
+      project: await fetchProject(railway, p.id),
       usage: await fetchProjectUsage(railway, p.id),
     })),
   );
@@ -84,7 +84,6 @@ describe("the mock Railway", () => {
     const service = environment?.services[0];
     if (!project || !environment || !service) throw new Error("Seed has no services");
 
-    await fetchProject(railway, project.id);
     const detail = await fetchService(railway, {
       serviceId: service.id,
       environmentId: environment.id,

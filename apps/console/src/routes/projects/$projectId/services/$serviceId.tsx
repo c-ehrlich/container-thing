@@ -17,12 +17,12 @@ import { timeAgo } from "../../../../domains/insights/health";
 import { insightsFor } from "../../../../domains/insights/insights";
 import { deploymentState } from "../../../../domains/project/deployment-state";
 import { primaryEnvironment } from "../../../../domains/project/environments";
-import { projectOverviewQuery } from "../../../../domains/project/overview";
-import type { ProjectOverview } from "../../../../domains/project/overview";
+import { projectQuery } from "../../../../domains/project/project";
+import type { Project } from "../../../../domains/project/project";
 import { serviceQuery } from "../../../../domains/project/service";
 
 /** The environment asked for, else the project's primary one if the service is in it, else the first that has it. */
-function environmentOf(project: ProjectOverview, serviceId: string, environmentId?: string) {
+function environmentOf(project: Project, serviceId: string, environmentId?: string) {
   const withService = project.environments.filter((e) =>
     e.services.some((s) => s.id === serviceId),
   );
@@ -36,9 +36,7 @@ function environmentOf(project: ProjectOverview, serviceId: string, environmentI
 export const Route = createFileRoute("/projects/$projectId/services/$serviceId")({
   loaderDeps: ({ search }) => ({ environmentId: search.environmentId }),
   loader: async ({ context, params, deps }) => {
-    const project = await context.queryClient.ensureQueryData(
-      projectOverviewQuery(params.projectId),
-    );
+    const project = await context.queryClient.ensureQueryData(projectQuery(params.projectId));
     const environment = environmentOf(project, params.serviceId, deps.environmentId);
     if (environment) {
       await context.queryClient.ensureQueryData(
@@ -55,7 +53,7 @@ const projectRoute = getRouteApi("/projects/$projectId");
 function ServicePage() {
   const { projectId, serviceId } = Route.useParams();
   const search = Route.useSearch();
-  const { data: project } = useSuspenseQuery(projectOverviewQuery(projectId));
+  const { data: project } = useSuspenseQuery(projectQuery(projectId));
   const dismissed = useDismissed(projectRoute.useLoaderData().dismissed);
   const environment = environmentOf(project, serviceId, search.environmentId);
   const service = environment?.services.find((s) => s.id === serviceId);

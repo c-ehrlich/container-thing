@@ -1,6 +1,6 @@
 import { cn } from "@repo/ui/lib/utils";
 
-import type { ProjectUsage } from "../../domains/project/overview";
+import type { ProjectUsage } from "../../domains/project/usage";
 
 /** "≈ $4.20/mo", once Railway has estimated the month. */
 export function MonthlyCost(props: { usage?: ProjectUsage; className?: string }) {

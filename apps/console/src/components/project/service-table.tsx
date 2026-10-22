@@ -6,12 +6,9 @@ import { KIND_ORDER, isDatastore, servicesOf, timeAgo } from "../../domains/insi
 import type { ServiceWithState } from "../../domains/insights/health";
 import type { Insight } from "../../domains/insights/insights";
 import { primaryActionFor } from "../../domains/insights/primary-action";
-import { serviceUsageKey } from "../../domains/project/overview";
-import type {
-  OverviewEnvironment,
-  ProjectOverview,
-  ProjectUsage,
-} from "../../domains/project/overview";
+import type { Environment, Project } from "../../domains/project/project";
+import { serviceUsageKey } from "../../domains/project/usage";
+import type { ProjectUsage } from "../../domains/project/usage";
 import { InsightActionButton } from "../overview/insight-action";
 import { Sparkline, formatCpu, formatMemory } from "../overview/sparkline";
 import { ServiceStatusBadge } from "../service-status-badge";
@@ -24,8 +21,8 @@ const COLUMNS =
  * last deploy, and the one action that fits. A row opens the service.
  */
 export function ServiceTable(props: {
-  project: ProjectOverview;
-  environment: OverviewEnvironment;
+  project: Project;
+  environment: Environment;
   usage?: ProjectUsage;
   insights: Insight[];
 }) {
@@ -67,7 +64,7 @@ export function ServiceTable(props: {
 }
 
 function ServiceRow(props: {
-  project: ProjectOverview;
+  project: Project;
   service: ServiceWithState;
   usage?: ProjectUsage["services"][string];
   insight?: Insight;

@@ -3,8 +3,8 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { deploymentState } from "../project/deployment-state";
-import { projectOverviewQuery, projectScope } from "../project/overview";
-import type { ProjectOverview } from "../project/overview";
+import { projectQuery, projectScope } from "../project/project";
+import type { Project } from "../project/project";
 import { logsQuery } from "../project/service";
 import { watchEnvironment } from "./environment";
 import { mergeLogLines, streamDeploymentLogs } from "./logs";
@@ -17,7 +17,7 @@ const POLL_INTERVAL_MS = 30_000;
  * Deploys in flight in one environment. Railway's canvas pushes already cover every other change, so
  * only these also get their own status subscription.
  */
-function deploysInFlight(project: ProjectOverview | undefined, environmentId: string): string[] {
+function deploysInFlight(project: Project | undefined, environmentId: string): string[] {
   return (
     project?.environments
       .find((e) => e.id === environmentId)
@@ -36,7 +36,7 @@ function deploysInFlight(project: ProjectOverview | undefined, environmentId: st
 function keepEnvironmentLive(queryClient: QueryClient, projectId: string, environmentId: string) {
   // Observing the project's query keeps it active, so invalidating it refetches it even when no
   // screen shows it right now, and lets it poll.
-  const query = projectOverviewQuery(projectId);
+  const query = projectQuery(projectId);
   const observer = new QueryObserver(queryClient, query);
 
   let polling = false;

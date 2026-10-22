@@ -12,12 +12,9 @@ import { BoxIcon, DatabaseIcon } from "lucide-react";
 
 import { isDatastore, servicesOf, timeAgo } from "../../domains/insights/health";
 import type { Kind, ServiceWithState } from "../../domains/insights/health";
-import { serviceUsageKey } from "../../domains/project/overview";
-import type {
-  OverviewEnvironment,
-  ProjectOverview,
-  ProjectUsage,
-} from "../../domains/project/overview";
+import type { Environment, Project } from "../../domains/project/project";
+import { serviceUsageKey } from "../../domains/project/usage";
+import type { ProjectUsage } from "../../domains/project/usage";
 import { KIND_TEXT } from "../status-colors";
 import { formatCpu, formatMemory } from "./sparkline";
 
@@ -40,8 +37,8 @@ type Node = ServiceWithState & { x: number; y: number; width: number; datastore:
 export type DiagramHighlight = { failed: string; affected: string[] };
 
 export function TopologyDiagram(props: {
-  project: ProjectOverview;
-  environment: OverviewEnvironment;
+  project: Project;
+  environment: Environment;
   usage?: ProjectUsage;
   highlight?: DiagramHighlight;
 }) {
@@ -134,7 +131,7 @@ export function TopologyDiagram(props: {
  * Fits a project card's thumbnail as well as the project page; the description only shows when
  * there's room for it.
  */
-function EmptyEnvironment(props: { environment: OverviewEnvironment }) {
+function EmptyEnvironment(props: { environment: Environment }) {
   return (
     <Empty className="pointer-events-none absolute inset-0 gap-0 p-4 [container-type:size]">
       <EmptyHeader className="gap-1">

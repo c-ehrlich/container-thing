@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useMatch } from "@tanstack/react-router";
 import { PanelLeftCloseIcon, PanelLeftOpenIcon, SparklesIcon } from "lucide-react";
 
-import { projectOverviewQuery } from "../../domains/project/overview";
+import { projectQuery } from "../../domains/project/project";
 import type { Viewer } from "../../domains/project/viewer";
 import type { Backend } from "../../server/railway/backend";
 import { ShortcutTooltip } from "./shortcut-tooltip";
@@ -39,7 +39,7 @@ export function AppHeader(props: {
     .find((p) => p.id === match?.params.projectId);
   // Already loaded by the project's pages, so this reads the cache.
   const { data: overview } = useQuery({
-    ...projectOverviewQuery(match?.params.projectId ?? ""),
+    ...projectQuery(match?.params.projectId ?? ""),
     enabled: serviceMatch !== undefined,
   });
   const service = overview?.environments

@@ -1,7 +1,7 @@
 import { PlayIcon, RotateCcwIcon, RotateCwIcon, SquareIcon, XIcon } from "lucide-react";
 
 import { deploymentState } from "../../domains/project/deployment-state";
-import type { LatestDeployment } from "../../domains/project/overview";
+import type { LatestDeployment } from "../../domains/project/project";
 import { ActionButton } from "../action-button";
 
 type Target = {

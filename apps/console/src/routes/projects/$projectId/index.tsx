@@ -14,7 +14,8 @@ import { useDismissed } from "../../../domains/insights/dismissed";
 import { healthOf, verdictOf } from "../../../domains/insights/health";
 import { insightsFor } from "../../../domains/insights/insights";
 import { pickEnvironment } from "../../../domains/project/environments";
-import { projectOverviewQuery, projectUsageQuery } from "../../../domains/project/overview";
+import { projectQuery } from "../../../domains/project/project";
+import { projectUsageQuery } from "../../../domains/project/usage";
 
 export const Route = createFileRoute("/projects/$projectId/")({
   component: ProjectPage,
@@ -32,7 +33,7 @@ function ProjectPage() {
   const { environmentId } = projectRoute.useSearch();
   const { dismissed: initiallyDismissed } = projectRoute.useLoaderData();
   const { viewer } = rootRoute.useLoaderData();
-  const { data: project } = useSuspenseQuery(projectOverviewQuery(projectId));
+  const { data: project } = useSuspenseQuery(projectQuery(projectId));
   const { data: usage } = useQuery(projectUsageQuery(projectId));
   const dismissed = useDismissed(initiallyDismissed);
 

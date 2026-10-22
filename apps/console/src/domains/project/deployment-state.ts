@@ -1,4 +1,4 @@
-import type { LatestDeployment } from "./overview";
+import type { LatestDeployment } from "./project";
 
 export type DeploymentState = {
   kind: "running" | "sleeping" | "pending" | "failed" | "stopped";

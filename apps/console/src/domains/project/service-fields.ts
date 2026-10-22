@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Flattening shared by the overview's and a service's queries, which ask Railway for the same fields
+ * Flattening shared by the project's and a service's queries, which ask Railway for the same fields
  * of a service instance and its deployments.
  */
 

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { graphql } from "../../lib/graphql/graphql";
 import type { RailwayClient } from "../../server/railway/railway-api";
 import { requireRailway } from "../../server/railway/require-railway";
-import { projectScope } from "./overview";
+import { projectScope } from "./project";
 import { deploymentMeta, domainsOf, oneDayAgo, sourceOf } from "./service-fields";
 
 /** One service in one environment: its settings, its deploys and its last day of CPU and memory. */

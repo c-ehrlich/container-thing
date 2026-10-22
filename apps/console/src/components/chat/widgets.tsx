@@ -15,18 +15,18 @@ import { CircleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useWatchEnvironments } from "../../domains/live";
-import { projectOverviewQuery } from "../../domains/project/overview";
-import type { OverviewService } from "../../domains/project/overview";
+import { projectQuery } from "../../domains/project/project";
+import type { Service } from "../../domains/project/project";
 import { ServiceStatusBadge } from "../service-status-badge";
 
 /**
- * Chat widgets get IDs from the tool call and everything else from `projectOverviewQuery`, the cache
+ * Chat widgets get IDs from the tool call and everything else from `projectQuery`, the cache
  * entry the pages use too. Watching the environment keeps it live even when no page shows it; when one
  * does, they share the same watch.
  */
 function useEnvironment(projectId: string, environmentId: string) {
   useWatchEnvironments([{ projectId, environmentIds: [environmentId] }]);
-  const { data: project, isPending, error } = useQuery(projectOverviewQuery(projectId));
+  const { data: project, isPending, error } = useQuery(projectQuery(projectId));
   return {
     project,
     environment: project?.environments.find((e) => e.id === environmentId),
@@ -89,7 +89,7 @@ export function ServiceListWidget(props: { projectId: string; environmentId: str
 }
 
 function ServiceSummary(props: {
-  service: OverviewService;
+  service: Service;
   context: string | undefined;
   projectId: string;
   environmentId: string;

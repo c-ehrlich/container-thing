@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
 
 import { deploymentState } from "../domains/project/deployment-state";
 import type { DeploymentState } from "../domains/project/deployment-state";
-import type { LatestDeployment } from "../domains/project/overview";
+import type { LatestDeployment } from "../domains/project/project";
 
 /** Color only where it matters: green when up, yellow on its way, red when broken. Off is gray. */
 const BADGE_VARIANT = {
