@@ -1,15 +1,16 @@
 import { TIMINGS, createMockRailway } from "@repo/railway-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { findTemplateSuggestion } from "../../domains/add-service/templates";
-import { insightsFor } from "../../domains/insights/insights";
-import { fetchProjectOverview, fetchProjectUsage } from "../../domains/project/overview";
 import {
   createService,
   deployService,
-  fetchProject,
+  runAction,
   stopService,
-} from "../../domains/project/project";
+} from "../../domains/actions/actions";
+import { findTemplateSuggestion } from "../../domains/add-service/templates";
+import { insightsFor } from "../../domains/insights/insights";
+import { fetchProjectOverview, fetchProjectUsage } from "../../domains/project/overview";
+import { fetchProject } from "../../domains/project/project";
 import { fetchLogs, fetchService } from "../../domains/project/service";
 import { fetchViewer } from "../../domains/project/viewer";
 import schema from "../../lib/graphql/railway-schema.graphql?raw";
@@ -147,6 +148,55 @@ describe("the mock Railway", () => {
     await deployService(railway, { serviceId, environmentId });
     await wait(fullDeploy);
     expect(await status()).toBe("SUCCESS");
+  });
+
+  it("runs every RailwayAction the buttons and insights offer", async () => {
+    const viewer = await fetchViewer(railway);
+    const projectId = viewer.workspaces[0]?.projects[0]?.id ?? "";
+    const environment = (await fetchProject(railway, projectId)).environments[0];
+    const environmentId = environment?.id ?? "";
+    const serviceId = await createService(railway, {
+      projectId,
+      environmentId,
+      name: "whoami",
+      image: "traefik/whoami",
+      variables: {},
+    });
+    const deploys = async () =>
+      (await fetchService(railway, { serviceId, environmentId })).deployments;
+    await wait(fullDeploy);
+    const [first] = await deploys();
+    if (!first) throw new Error("Never deployed");
+
+    await runAction(railway, { kind: "restart", deploymentId: first.id });
+    expect((await deploys())[0]?.status).toBe("DEPLOYING");
+    await wait(fullDeploy);
+
+    await runAction(railway, { kind: "deploy", serviceId, environmentId });
+    const [second] = await deploys();
+    expect(second?.id).not.toBe(first.id);
+    await runAction(railway, { kind: "cancel", deploymentId: second?.id ?? "" });
+    expect((await deploys())[0]?.status).toBe("REMOVED");
+
+    await runAction(railway, { kind: "rollback", deploymentId: first.id });
+    await wait(fullDeploy);
+    const [rolledBack] = await deploys();
+    expect(rolledBack?.status).toBe("SUCCESS");
+
+    await runAction(railway, { kind: "remove", deploymentId: rolledBack?.id ?? "" });
+    expect((await deploys())[0]?.status).toBe("REMOVING");
+
+    await runAction(railway, {
+      kind: "remove-service",
+      serviceId,
+      serviceName: "whoami",
+      environmentId,
+      environmentName: environment?.name ?? "",
+    });
+    const services = (await fetchProject(railway, projectId)).environments.find(
+      (e) => e.id === environmentId,
+    )?.services;
+    expect(services?.map((s) => s.id)).not.toContain(serviceId);
   });
 
   it("fails images tagged :broken", async () => {

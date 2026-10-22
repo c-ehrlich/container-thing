@@ -2,7 +2,6 @@ import { cn } from "@repo/ui/lib/utils";
 import { HistoryIcon } from "lucide-react";
 
 import { timeAgo } from "../../domains/insights/health";
-import { deploymentActionFn } from "../../domains/project/project";
 import type { ServiceDeployment } from "../../domains/project/service";
 import { ActionButton } from "../action-button";
 import { ServiceStatusBadge } from "../service-status-badge";
@@ -65,15 +64,10 @@ export function DeploymentList(props: {
                 <ActionButton
                   projectId={props.projectId}
                   label="Roll back"
-                  pending="Rolling back…"
                   variant="ghost"
                   icon={<HistoryIcon data-icon="inline-start" />}
                   title="Deploys this version again, replacing what's running"
-                  run={() =>
-                    deploymentActionFn({
-                      data: { deploymentId: deployment.id, action: "rollback" },
-                    })
-                  }
+                  action={{ kind: "rollback", deploymentId: deployment.id }}
                 />
               )}
             </div>

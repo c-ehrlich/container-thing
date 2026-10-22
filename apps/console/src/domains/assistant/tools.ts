@@ -3,9 +3,10 @@ import type { InferUITools, UIDataTypes, UIMessage } from "ai";
 import { z } from "zod";
 
 import type { RailwayClient } from "../../server/railway/railway-api";
+import { deployService, stopService } from "../actions";
 import { deploymentState } from "../project/deployment-state";
 import { pickEnvironment } from "../project/environments";
-import { deployService, fetchProject, stopService } from "../project/project";
+import { fetchProject } from "../project/project";
 import { fetchViewer } from "../project/viewer";
 
 const ServiceTarget = z.object({

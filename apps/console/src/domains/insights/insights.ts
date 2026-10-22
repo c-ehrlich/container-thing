@@ -1,3 +1,4 @@
+import type { RailwayAction } from "../actions";
 import { primaryEnvironment } from "../project/environments";
 import type { OverviewDeployment, ProjectOverview, ProjectUsage } from "../project/overview";
 import { listOf, servicesOf, timeAgo } from "./health";
@@ -9,19 +10,9 @@ import type { ServiceWithState } from "./health";
  * and its CPU, so it can't make things up.
  */
 
+/** An insight's button: a change to Railway, or a link to where the rest happens. */
 export type InsightAction =
-  | { kind: "restart"; label: string; deploymentId: string }
-  | { kind: "rollback"; label: string; deploymentId: string }
-  | { kind: "cancel"; label: string; deploymentId: string }
-  | { kind: "deploy"; label: string; serviceId: string; environmentId: string }
-  | {
-      kind: "remove-service";
-      label: string;
-      serviceId: string;
-      serviceName: string;
-      environmentId: string;
-      environmentName: string;
-    }
+  | (RailwayAction & { label: string })
   | { kind: "open-project"; label: string; projectId: string; environmentId?: string }
   | { kind: "railway"; label: string; href: string };
 

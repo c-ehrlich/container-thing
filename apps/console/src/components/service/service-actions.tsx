@@ -2,9 +2,7 @@ import { PlayIcon, RotateCcwIcon, RotateCwIcon, SquareIcon, XIcon } from "lucide
 
 import { deploymentState } from "../../domains/project/deployment-state";
 import type { LatestDeployment } from "../../domains/project/overview";
-import { deployServiceFn, deploymentActionFn } from "../../domains/project/project";
 import { ActionButton } from "../action-button";
-import { InsightActionButton } from "../overview/insight-action";
 
 type Target = {
   projectId: string;
@@ -27,7 +25,7 @@ export function ServiceActions(props: Target) {
     deployment?.status === "SUCCESS" ||
     deployment?.status === "SLEEPING" ||
     deployment?.status === "CRASHED";
-  const deploy = () => deployServiceFn({ data: { serviceId, environmentId } });
+  const deploy = { kind: "deploy", serviceId, environmentId } as const;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -35,12 +33,9 @@ export function ServiceActions(props: Target) {
         <ActionButton
           projectId={projectId}
           label="Restart"
-          pending="Restarting…"
           icon={<RotateCwIcon data-icon="inline-start" />}
           title="Restarts the current deployment without building again"
-          run={() =>
-            deploymentActionFn({ data: { deploymentId: deployment.id, action: "restart" } })
-          }
+          action={{ kind: "restart", deploymentId: deployment.id }}
         />
       )}
       {kind === "stopped" ? (
@@ -50,47 +45,40 @@ export function ServiceActions(props: Target) {
           pending="Starting…"
           variant="default"
           icon={<PlayIcon data-icon="inline-start" />}
-          run={deploy}
+          action={deploy}
         />
       ) : (
         <ActionButton
           projectId={projectId}
           label="Redeploy"
-          pending="Deploying…"
           icon={<RotateCcwIcon data-icon="inline-start" />}
           title="Deploys the latest source again"
-          run={deploy}
+          action={deploy}
         />
       )}
       {deployment && kind === "pending" && (
         <ActionButton
           projectId={projectId}
           label="Cancel deploy"
-          pending="Cancelling…"
           icon={<XIcon data-icon="inline-start" />}
-          run={() =>
-            deploymentActionFn({ data: { deploymentId: deployment.id, action: "cancel" } })
-          }
+          action={{ kind: "cancel", deploymentId: deployment.id }}
         />
       )}
       {deployment && hasContainer && (
         <ActionButton
           projectId={projectId}
           label="Stop"
-          pending="Stopping…"
           icon={<SquareIcon data-icon="inline-start" />}
           title="Removes the running deployment. Start deploys it again."
-          run={() =>
-            deploymentActionFn({ data: { deploymentId: deployment.id, action: "remove" } })
-          }
+          action={{ kind: "remove", deploymentId: deployment.id }}
         />
       )}
-      <InsightActionButton
+      <ActionButton
         projectId={projectId}
+        label="Remove"
         variant="ghost"
         action={{
           kind: "remove-service",
-          label: "Remove",
           serviceId,
           serviceName: props.serviceName,
           environmentId,

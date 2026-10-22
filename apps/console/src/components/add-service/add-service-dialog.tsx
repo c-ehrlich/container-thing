@@ -12,16 +12,15 @@ import {
   DialogTrigger,
 } from "@repo/ui/primitives/dialog";
 import { FieldDescription, FieldError, FieldGroup } from "@repo/ui/primitives/field";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { z } from "zod";
 
+import { createServiceFn, useProjectMutation } from "../../domains/actions";
 import { IMAGE_REF, imageBaseName, parseImageRef } from "../../domains/add-service/image-ref";
 import { templateSuggestionQuery } from "../../domains/add-service/templates";
 import type { SuggestedVariable, TemplateSuggestion } from "../../domains/add-service/templates";
-import { projectScope } from "../../domains/project/overview";
-import { createServiceFn } from "../../domains/project/project";
 import { ImageField } from "./image-field";
 
 /** Adds a service to the environment from a Docker image, in two steps: the image, then its variables. */
@@ -143,13 +142,7 @@ function AddServiceSteps(props: {
     },
   });
 
-  const create = useMutation({
-    mutationFn: createServiceFn,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: projectScope(projectId) });
-      onCreated();
-    },
-  });
+  const create = useProjectMutation(projectId, createServiceFn);
 
   const variablesForm = useAppForm({
     ...variablesFormOptions,
@@ -167,8 +160,9 @@ function AddServiceSteps(props: {
             variables: Object.fromEntries(value.variables.map((v) => [v.key, v.value])),
           },
         })
-        // `create.error` shows it below.
-        .catch(() => undefined);
+        // Settles once the project is refetched, so the new service is on the canvas when it closes.
+        // `create.error` shows a failure below.
+        .then(onCreated, () => undefined);
     },
   });
 

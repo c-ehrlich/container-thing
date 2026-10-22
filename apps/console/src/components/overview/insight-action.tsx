@@ -4,11 +4,6 @@ import { Link } from "@tanstack/react-router";
 import { ArrowUpRightIcon } from "lucide-react";
 
 import type { Insight, InsightAction } from "../../domains/insights/insights";
-import {
-  deployServiceFn,
-  deploymentActionFn,
-  removeServiceFn,
-} from "../../domains/project/project";
 import { ActionButton } from "../action-button";
 
 type Props = {
@@ -68,55 +63,12 @@ export function InsightActionButton(props: Props) {
       </Link>
     );
   }
-  if (action.kind === "remove-service") {
-    // Deleting can't be undone, so it asks first and says exactly what goes.
-    return (
-      <ActionButton
-        projectId={props.projectId}
-        label={action.label}
-        pending="Removing…"
-        variant={variant}
-        run={() =>
-          removeServiceFn({
-            data: { serviceId: action.serviceId, environmentId: action.environmentId },
-          })
-        }
-        confirm={{
-          title: `Remove ${action.serviceName} from ${action.environmentName}?`,
-          description: `Its settings and variables in ${action.environmentName} are deleted. Other environments keep theirs. This can't be undone.`,
-          action: "Remove",
-        }}
-      />
-    );
-  }
   return (
     <ActionButton
       projectId={props.projectId}
+      action={action}
       label={action.label}
-      pending={PENDING[action.kind]}
       variant={variant}
-      run={() => run(action)}
     />
   );
-}
-
-type MutationAction = Extract<
-  InsightAction,
-  { kind: "restart" | "rollback" | "cancel" | "deploy" }
->;
-
-const PENDING: Record<MutationAction["kind"], string> = {
-  restart: "Restarting…",
-  rollback: "Rolling back…",
-  cancel: "Cancelling…",
-  deploy: "Deploying…",
-};
-
-/** The refetch afterwards sees the new deploy as in flight, which keeps the overview polling until it lands. */
-function run(action: MutationAction) {
-  return action.kind === "deploy"
-    ? deployServiceFn({
-        data: { serviceId: action.serviceId, environmentId: action.environmentId },
-      })
-    : deploymentActionFn({ data: { deploymentId: action.deploymentId, action: action.kind } });
 }

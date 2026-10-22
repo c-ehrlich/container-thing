@@ -11,36 +11,29 @@ import {
 } from "@repo/ui/primitives/alert-dialog";
 import { Button } from "@repo/ui/primitives/button";
 import { Spinner } from "@repo/ui/primitives/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { projectScope } from "../domains/project/overview";
+import { describeAction, useRailwayAction } from "../domains/actions";
+import type { RailwayAction } from "../domains/actions";
 
 /**
- * A button for one Railway call. Afterwards the project is refetched everywhere it's shown: the
- * overview and service queries all live under `projectScope`. With `confirm`, it asks
- * first, for calls that can't be undone.
+ * A button that runs one `RailwayAction`; afterwards the project is refetched everywhere it's shown.
+ * Actions that can't be undone ask first.
  */
 export function ActionButton(props: {
   projectId: string;
+  action: RailwayAction;
   label: string;
-  pending: string;
-  run: () => Promise<unknown>;
+  /** What it says while running, if not the action's usual wording ("Starting…" for a deploy). */
+  pending?: string;
   icon?: React.ReactNode;
   title?: string;
   variant?: "default" | "outline" | "ghost";
-  confirm?: { title: string; description: string; action: string };
 }) {
-  const { confirm } = props;
-  const queryClient = useQueryClient();
+  const { pending, confirm } = describeAction(props.action);
   const [open, setOpen] = useState(false);
-  const mutation = useMutation({
-    mutationFn: props.run,
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: projectScope(props.projectId),
-      }),
-  });
+  const mutation = useRailwayAction(props.projectId);
+  const run = () => mutation.mutate(props.action);
 
   const button = {
     size: "sm",
@@ -51,13 +44,17 @@ export function ActionButton(props: {
   const content = (
     <>
       {mutation.isPending ? <Spinner data-icon="inline-start" /> : props.icon}
-      {mutation.isPending ? props.pending : mutation.isError ? "Try again" : props.label}
+      {mutation.isPending
+        ? (props.pending ?? pending)
+        : mutation.isError
+          ? "Try again"
+          : props.label}
     </>
   );
 
   if (!confirm) {
     return (
-      <Button {...button} onClick={() => mutation.mutate()}>
+      <Button {...button} onClick={run}>
         {content}
       </Button>
     );
@@ -77,7 +74,7 @@ export function ActionButton(props: {
             variant="destructive"
             onClick={() => {
               setOpen(false);
-              mutation.mutate();
+              run();
             }}
           >
             {confirm.action}
