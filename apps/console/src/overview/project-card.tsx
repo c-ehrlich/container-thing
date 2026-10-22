@@ -24,7 +24,7 @@ export function ProjectCard(props: { project: ProjectOverview; usage?: ProjectUs
   const domains = primaryEnvironment(project)?.services.flatMap((s) => s.domains) ?? [];
 
   return (
-    <article className="group relative overflow-hidden rounded-xl border bg-card transition-[border-color,translate,box-shadow] hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg hover:shadow-black/30">
+    <article className="group relative isolate overflow-hidden rounded-xl border bg-card transition-[border-color,translate,box-shadow] hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg hover:shadow-black/30">
       {/* Above the card-wide link so services can be hovered and opened, and services added;
           clicks elsewhere fall through to the link. */}
       <DotGrid className="pointer-events-none relative z-10 h-44 border-b">
@@ -46,7 +46,7 @@ export function ProjectCard(props: { project: ProjectOverview; usage?: ProjectUs
         )}
       </DotGrid>
 
-      <div className="grid gap-3 p-4">
+      <div className="grid grid-cols-1 gap-3 p-4">
         <div className="flex items-baseline justify-between gap-3">
           <Link
             to="/projects/$projectId"

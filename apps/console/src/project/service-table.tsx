@@ -79,7 +79,7 @@ function ServiceRow(props: {
     <div
       className={cn(
         COLUMNS,
-        "relative border-b px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted/30",
+        "relative isolate border-b px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted/30",
         service.state.kind === "failed" && "bg-destructive/5",
       )}
     >

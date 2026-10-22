@@ -30,7 +30,7 @@ export function DeploymentList(props: {
           <li
             key={deployment.id}
             className={cn(
-              "relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2.5 hover:bg-muted/40",
+              "relative isolate grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2.5 hover:bg-muted/40",
               deployment.id === props.selectedId && "bg-muted/60 hover:bg-muted/60",
             )}
           >
