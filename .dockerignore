@@ -1,0 +1,15 @@
+**/node_modules
+**/.turbo
+**/dist
+**/.output
+**/.nitro
+**/.tanstack
+**/*.tsbuildinfo
+**/storybook-static
+
+**/.env
+**/.env.*
+!.env.example
+
+.git
+**/.DS_Store

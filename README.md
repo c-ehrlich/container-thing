@@ -19,6 +19,17 @@ pnpm format       # oxfmt
 pnpm lint         # oxlint (type-aware)
 ```
 
+## Deploying
+
+The console runs on [Railway](https://railway.com), built by Railpack from the repo root. The service is described in `.railway/railway.ts` ([docs](https://docs.railway.com/infrastructure-as-code)); Railway doesn't read it during deploys, it's applied with the Railway CLI:
+
+```sh
+railway config plan    # preview changes to the linked environment
+railway config apply   # apply them
+```
+
+Secrets (`RAILWAY_OAUTH_CLIENT_ID`, `RAILWAY_OAUTH_CLIENT_SECRET`, `SESSION_SECRET`, `OPENROUTER_API_KEY`) are set in Railway as sealed variables. `APP_URL` defaults to the service's generated domain; register `<APP_URL>/auth/callback` on the Railway OAuth app.
+
 ## Tooling
 
 - **TypeScript** (v7): shared strict config in `tsconfig.base.json`. Each package extends it and runs `tsc` through Turbo.
