@@ -12,7 +12,6 @@ import { Button } from "@repo/ui/primitives/button";
 import {
   Popover,
   PopoverContent,
-  PopoverDescription,
   PopoverHeader,
   PopoverTitle,
   PopoverTrigger,
@@ -61,10 +60,6 @@ export function BackendMenu({ backend }: { backend: Backend }) {
           <PopoverContent side="right" align="end" className="w-72">
             <PopoverHeader>
               <PopoverTitle>Data source</PopoverTitle>
-              <PopoverDescription>
-                The mock has many more projects. Changes there only happen in this app; nothing is
-                deployed.
-              </PopoverDescription>
             </PopoverHeader>
             <ToggleGroup
               size="sm"
