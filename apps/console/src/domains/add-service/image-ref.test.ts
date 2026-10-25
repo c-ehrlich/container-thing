@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { IMAGE_REF, imageBaseName, parseImageRef } from "./image-ref";
+import {
+  IMAGE_NAME,
+  IMAGE_REF,
+  IMAGE_TAG,
+  imageBaseName,
+  parseImageRef,
+  splitTag,
+} from "./image-ref";
 
 describe("parseImageRef", () => {
   it.each([
@@ -92,4 +99,46 @@ describe("IMAGE_REF", () => {
       expect(ref).not.toMatch(IMAGE_REF);
     },
   );
+});
+
+describe("IMAGE_NAME", () => {
+  it.each(["postgres", "traefik/whoami", "ghcr.io/owner/repo", "localhost:5000/app"])(
+    "accepts %s",
+    (name) => {
+      expect(name).toMatch(IMAGE_NAME);
+    },
+  );
+
+  it.each(["", "Postgres", "postgres:18", `redis@sha256:${"0".repeat(64)}`, "a//b"])(
+    "rejects %j",
+    (name) => {
+      expect(name).not.toMatch(IMAGE_NAME);
+    },
+  );
+});
+
+describe("IMAGE_TAG", () => {
+  it.each(["latest", "18", "18-alpine", "v1.10", "_x"])("accepts %s", (tag) => {
+    expect(tag).toMatch(IMAGE_TAG);
+  });
+
+  it.each(["", "-bad", ".bad", "has space", "a:b"])("rejects %j", (tag) => {
+    expect(tag).not.toMatch(IMAGE_TAG);
+  });
+});
+
+describe("splitTag", () => {
+  it.each([
+    ["postgres", { name: "postgres", tag: null }],
+    [" postgres:18 ", { name: "postgres", tag: "18" }],
+    ["redis:", { name: "redis", tag: "" }],
+    ["ghcr.io/owner/repo:v2", { name: "ghcr.io/owner/repo", tag: "v2" }],
+    ["localhost:5000/app", { name: "localhost:5000/app", tag: null }],
+    ["localhost:5000/app:dev", { name: "localhost:5000/app", tag: "dev" }],
+    // Kept as written, not normalized.
+    ["docker.io/library/postgres:18", { name: "docker.io/library/postgres", tag: "18" }],
+    [`redis:8@sha256:${"a".repeat(64)}`, { name: `redis:8@sha256:${"a".repeat(64)}`, tag: null }],
+  ])("%j", (ref, expected) => {
+    expect(splitTag(ref)).toEqual(expected);
+  });
 });

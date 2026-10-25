@@ -1,9 +1,17 @@
+const NAME = String.raw`(?:[a-z0-9.-]+(?::\d+)?\/)?[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*`;
+const TAG = String.raw`\w[\w.-]{0,127}`;
+
 /**
  * A Docker image reference like `postgres:18`, `traefik/whoami` or `ghcr.io/owner/repo:tag`, roughly
  * following the grammar Docker itself accepts.
  */
-export const IMAGE_REF =
-  /^(?:[a-z0-9.-]+(?::\d+)?\/)?[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*(?::\w[\w.-]{0,127})?(?:@sha256:[a-f0-9]{64})?$/;
+export const IMAGE_REF = new RegExp(`^${NAME}(?::${TAG})?(?:@sha256:[a-f0-9]{64})?$`);
+/** An image name without tag or digest, like `postgres` or `ghcr.io/owner/repo`. */
+export const IMAGE_NAME = new RegExp(`^${NAME}$`);
+export const IMAGE_TAG = new RegExp(`^${TAG}$`);
+
+/** What Docker pulls when no tag is given. */
+export const DEFAULT_TAG = "latest";
 
 export interface ImageRef {
   /** `null` for Docker Hub. */
@@ -37,4 +45,16 @@ export function parseImageRef(ref: string): ImageRef {
 /** The last path segment, which makes a good default service name: `traefik/whoami` → `whoami`. */
 export function imageBaseName(ref: string) {
   return parseImageRef(ref).repository.split("/").at(-1) ?? "";
+}
+
+/**
+ * Takes a tag off a typed or pasted reference, keeping the rest as written: `postgres:18` →
+ * `postgres` and `18`. `tag` is `null` if there is none, and references pinned to a digest are left
+ * whole.
+ */
+export function splitTag(ref: string): { name: string; tag: string | null } {
+  const trimmed = ref.trim();
+  const { tag } = parseImageRef(trimmed);
+  if (tag === null || trimmed.includes("@")) return { name: trimmed, tag: null };
+  return { name: trimmed.slice(0, -(tag.length + 1)), tag };
 }

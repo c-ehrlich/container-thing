@@ -18,10 +18,17 @@ import { useRef, useState } from "react";
 import { z } from "zod";
 
 import { createServiceFn, useProjectMutation } from "../../domains/actions";
-import { IMAGE_REF, imageBaseName, parseImageRef } from "../../domains/add-service/image-ref";
+import {
+  DEFAULT_TAG,
+  IMAGE_NAME,
+  IMAGE_TAG,
+  imageBaseName,
+  parseImageRef,
+  splitTag,
+} from "../../domains/add-service/image-ref";
 import { templateSuggestionQuery } from "../../domains/add-service/templates";
 import type { SuggestedVariable, TemplateSuggestion } from "../../domains/add-service/templates";
-import { ImageField } from "./image-field";
+import { ImageField, TagField } from "./image-field";
 
 /** Adds a service to the environment from a Docker image, in two steps: the image, then its variables. */
 export function AddServiceDialog(props: { projectId: string; environmentId: string }) {
@@ -45,13 +52,21 @@ const ImageStep = z.object({
     .string()
     .trim()
     .min(1, "Pick an image or type its name.")
-    .regex(IMAGE_REF, "That isn't a valid image name. Names are lowercase, like postgres:18."),
+    .regex(IMAGE_NAME, "That isn't a valid image name. Names are lowercase, like postgres."),
+  tag: z
+    .string()
+    .trim()
+    .refine((tag) => !tag || IMAGE_TAG.test(tag), "Use letters, numbers, ., - and _."),
   name: z
     .string()
     .trim()
     .regex(/^[\w-]*$/, "Use letters, numbers, - and _.")
     .max(63, "Keep it under 64 characters."),
 });
+
+/** The reference to deploy; a blank tag means the default. */
+const imageRef = (values: { image: string; tag: string }) =>
+  `${values.image.trim()}:${values.tag.trim() || DEFAULT_TAG}`;
 
 interface VariableRow extends SuggestedVariable {
   /** Only for React keys, so removing a row doesn't shuffle the inputs. */
@@ -125,7 +140,7 @@ function AddServiceSteps(props: {
   const filledFor = useRef<string | null>(null);
 
   const imageForm = useAppForm({
-    defaultValues: { image: "", name: "" },
+    defaultValues: { image: "", tag: DEFAULT_TAG, name: "" },
     validationLogic: revalidateLogic(),
     validators: { onDynamic: ImageStep },
     onSubmit: async ({ value }) => {
@@ -142,6 +157,14 @@ function AddServiceSteps(props: {
     },
   });
 
+  // People paste `postgres:18` into the image field; the tag belongs in its own.
+  const moveTagOut = () => {
+    const { name, tag } = splitTag(imageForm.getFieldValue("image"));
+    if (tag === null) return;
+    imageForm.setFieldValue("image", name);
+    if (tag) imageForm.setFieldValue("tag", tag);
+  };
+
   const create = useProjectMutation(projectId, createServiceFn);
 
   const variablesForm = useAppForm({
@@ -155,7 +178,7 @@ function AddServiceSteps(props: {
           data: {
             projectId,
             environmentId,
-            image: image.trim(),
+            image: imageRef(imageForm.state.values),
             name: name.trim() || imageBaseName(image),
             variables: Object.fromEntries(value.variables.map((v) => [v.key, v.value])),
           },
@@ -167,6 +190,7 @@ function AddServiceSteps(props: {
   });
 
   const image = useStore(imageForm.store, (state) => state.values.image.trim());
+  const ref = useStore(imageForm.store, (state) => imageRef(state.values));
 
   if (step === "image") {
     return (
@@ -176,6 +200,7 @@ function AddServiceSteps(props: {
           noValidate
           onSubmit={(event) => {
             event.preventDefault();
+            moveTagOut();
             void imageForm.handleSubmit();
           }}
         >
@@ -186,16 +211,24 @@ function AddServiceSteps(props: {
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
-            <imageForm.AppField name="image">
-              {() => (
-                <ImageField
-                  // Usually the next step; start looking up its variables now.
-                  onPick={(picked) =>
-                    void queryClient.prefetchQuery(templateSuggestionQuery(picked))
-                  }
-                />
-              )}
-            </imageForm.AppField>
+            <div className="grid grid-cols-3 items-start gap-3">
+              <imageForm.AppField name="image" listeners={{ onBlur: moveTagOut }}>
+                {() => (
+                  <ImageField
+                    className="col-span-2 min-w-0"
+                    onPick={(picked) => {
+                      // A tag picked for the previous image probably doesn't exist for this one.
+                      imageForm.setFieldValue("tag", DEFAULT_TAG);
+                      // Usually the next step; start looking up its variables now.
+                      void queryClient.prefetchQuery(templateSuggestionQuery(picked));
+                    }}
+                  />
+                )}
+              </imageForm.AppField>
+              <imageForm.AppField name="tag">
+                {() => <TagField className="min-w-0" image={image} />}
+              </imageForm.AppField>
+            </div>
             <imageForm.AppField name="name">
               {(field) => (
                 <field.TextField
@@ -226,7 +259,7 @@ function AddServiceSteps(props: {
         }}
       >
         <DialogHeader>
-          <DialogTitle>Variables for {image}</DialogTitle>
+          <DialogTitle>Variables for {ref}</DialogTitle>
           <DialogDescription>
             {suggestion
               ? `Suggested by Railway's ${suggestion.templateName} template. Change anything you like.`

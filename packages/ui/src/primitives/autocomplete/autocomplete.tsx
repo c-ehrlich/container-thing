@@ -16,11 +16,13 @@ function AutocompleteInput({
   disabled = false,
   ...props
 }: AutocompletePrimitive.Input.Props) {
+  // Base UI's `InputGroup` part makes the whole group the popup's anchor, so the popup keeps the
+  // field's width when an addon (like a spinner) appears and squeezes the input.
   return (
-    <InputGroup className={cn("w-auto", className)}>
+    <AutocompletePrimitive.InputGroup render={<InputGroup className={cn("w-auto", className)} />}>
       <AutocompletePrimitive.Input render={<InputGroupInput disabled={disabled} />} {...props} />
       {children && <InputGroupAddon align="inline-end">{children}</InputGroupAddon>}
-    </InputGroup>
+    </AutocompletePrimitive.InputGroup>
   );
 }
 
