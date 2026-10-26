@@ -21,7 +21,7 @@ const cached = createCachedLoader(new MemoryCache({ maxEntries: 5_000 }), {
 const budget = new HubBudget();
 
 const ImageSuggestion = z.object({
-  /** What goes in the image field, e.g. `postgres` or `traefik/whoami:v1.10`. */
+  /** What goes in the image field, e.g. `postgres` or `traefik/whoami`. */
   ref: z.string(),
   description: z.string().nullable(),
   official: z.boolean(),
@@ -73,7 +73,8 @@ const searchImagesFn = createServerFn({ method: "GET" })
 
 const listTagsFn = createServerFn({ method: "GET" })
   .middleware([requireRailway])
-  .validator(z.object({ repository: z.string().min(1), prefix: z.string() }))
+  // Docker's own limits: names are at most 255 characters, tags 128. They also bound the cache keys.
+  .validator(z.object({ repository: z.string().min(1).max(255), prefix: z.string().max(128) }))
   .handler(({ data }): Promise<string[]> => {
     // Official images live under `library/` in the API, though nobody types that.
     const path = data.repository.includes("/") ? data.repository : `library/${data.repository}`;

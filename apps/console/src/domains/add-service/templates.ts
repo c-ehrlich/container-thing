@@ -165,7 +165,7 @@ function toSuggestion(templateName: string, service: TemplateService): TemplateS
 
 const findTemplateSuggestionFn = createServerFn({ method: "GET" })
   .middleware([requireRailway])
-  .validator(z.object({ image: z.string().min(1) }))
+  .validator(z.object({ image: z.string().min(1).max(512) }))
   .handler(({ data, context }) => findTemplateSuggestion(context.railway, data.image));
 
 export const templateSuggestionQuery = (image: string) =>
