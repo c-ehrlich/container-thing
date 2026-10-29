@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { ChatPanel } from "../components/chat/chat-panel";
 import { AppHeader } from "../components/shell/app-header";
 import { AppSidebar } from "../components/shell/app-sidebar";
+import { SignInScreen } from "../components/shell/sign-in-screen";
 import { fetchViewer } from "../domains/project/viewer";
 import type { RouterContext } from "../router";
 import { getRailway, readBackend } from "../server/railway/backend";
@@ -70,7 +71,7 @@ function RootLayout() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  if (!viewer) return <Outlet />;
+  if (!viewer) return <SignInScreen />;
 
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "graphql-ws";
 import type { Client } from "graphql-ws";
 
+import { SIGNED_OUT_MESSAGE, goToSignIn } from "../../lib/sign-in";
 import { getFreshSession } from "../../server/auth/oauth";
 import { keepSubscribed } from "./transport";
 import type { LiveConnection, LiveTransport } from "./transport";
@@ -43,7 +44,8 @@ function createRelayTransport(): LiveTransport {
       const { signedIn } = await ensureLiveSession();
       if (!signedIn) {
         setConnection("signed-out");
-        throw new SignedOutError("Not signed in to Railway");
+        goToSignIn();
+        throw new SignedOutError(SIGNED_OUT_MESSAGE);
       }
       const url = new URL("/api/live", window.location.href);
       url.protocol = url.protocol === "https:" ? "wss:" : "ws:";

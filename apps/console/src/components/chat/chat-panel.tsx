@@ -15,6 +15,7 @@ import { ArrowUpIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
 import type { ChatMessage } from "../../domains/assistant/tools";
+import { goToSignIn, isSignedOutError } from "../../lib/sign-in";
 import { ShortcutTooltip } from "../shell/shortcut-tooltip";
 import { MessagePart } from "./message-parts";
 import type { ApprovalHandler } from "./message-parts";
@@ -31,6 +32,10 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     useChat<ChatMessage>({
       // Once the user confirms or cancels a stop, send that back so the model can continue.
       sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+      // The transport throws the route's 401 body as the message.
+      onError: (chatError) => {
+        if (isSignedOutError(chatError)) goToSignIn();
+      },
     });
 
   // Every request tells the model which project is on screen, so "start the api" just works.

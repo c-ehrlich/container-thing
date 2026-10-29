@@ -113,6 +113,31 @@ export async function finishLogin(params: URLSearchParams): Promise<LoginResult>
 const REFRESH_MARGIN_MS = 60_000;
 
 /**
+ * Refreshes in flight or recently finished, by the refresh token they used. Railway rotates refresh
+ * tokens and rejects a used one, but a page fires many server functions at once, all carrying the
+ * same expired session: without this only the first would refresh and the rest would look signed
+ * out. Kept for a while after, for requests that left the browser before the new cookie arrived.
+ */
+const refreshes = new Map<string, Promise<Session | null>>();
+const REFRESH_REUSE_MS = 5 * 60_000;
+
+function refreshSession(refreshToken: string): Promise<Session | null> {
+  let refresh = refreshes.get(refreshToken);
+  if (!refresh) {
+    refresh = railwayOAuth()
+      .refreshAccessToken(TOKEN_ENDPOINT, refreshToken, [])
+      .then((tokens) => sessionFromTokens(tokens, refreshToken))
+      .catch((cause: unknown) => {
+        console.error("Railway token refresh failed", cause);
+        return null;
+      });
+    refreshes.set(refreshToken, refresh);
+    setTimeout(() => refreshes.delete(refreshToken), REFRESH_REUSE_MS);
+  }
+  return refresh;
+}
+
+/**
  * The current session with an access token that is valid for at least another minute,
  * refreshing (and re-saving the cookie) if needed. Null when signed out or the refresh failed.
  */
@@ -122,17 +147,7 @@ export async function getFreshSession(): Promise<Session | null> {
   if (session.accessTokenExpiresAt - Date.now() > REFRESH_MARGIN_MS) return session;
   if (!session.refreshToken) return null;
 
-  try {
-    const tokens = await railwayOAuth().refreshAccessToken(
-      TOKEN_ENDPOINT,
-      session.refreshToken,
-      [],
-    );
-    const refreshed = sessionFromTokens(tokens, session.refreshToken);
-    await writeSession(refreshed);
-    return refreshed;
-  } catch (cause) {
-    console.error("Railway token refresh failed", cause);
-    return null;
-  }
+  const refreshed = await refreshSession(session.refreshToken);
+  if (refreshed) await writeSession(refreshed);
+  return refreshed;
 }
