@@ -13,5 +13,8 @@
  * - `transport.ts` is the interface between the engine and the wire, so tests can drive the engine
  *   with a fake connection.
  * - `use-live.ts` is the only part that knows about React and the query cache.
+ *
+ * Pushes are one of three ways a project gets refreshed; the other two are in `domains/actions`. See
+ * `projectScope` in `domains/project/project.ts` for all three.
  */
 export { useDeploymentLogStream, useWatchEnvironments } from "./use-live";

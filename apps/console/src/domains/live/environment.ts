@@ -96,13 +96,15 @@ export function watchEnvironment(
 
   let lastHash: string | undefined;
   let lastPushAt = Date.now();
-  let canvasFailed = false;
+  // `canvasInvalidation` errored or sent something we can't read. Only a good push clears this: the
+  // watchdog would otherwise mark it available again, since the last push was recent.
+  let canvasErrored = false;
   const failCanvas = () => {
-    canvasFailed = true;
+    canvasErrored = true;
     setCanvasAvailable(false);
   };
   const watchdog = setInterval(() => {
-    if (canvasFailed) return;
+    if (canvasErrored) return;
     setCanvasAvailable(Date.now() - lastPushAt <= CANVAS_SILENCE_MS);
   }, WATCHDOG_INTERVAL_MS);
   const unsubscribeCanvas = transport.subscribe(
@@ -112,7 +114,7 @@ export function watchEnvironment(
       next: (data) => {
         const parsed = CanvasInvalidation.safeParse(data);
         if (!parsed.success) return failCanvas();
-        canvasFailed = false;
+        canvasErrored = false;
         lastPushAt = Date.now();
         setCanvasAvailable(true);
         // Railway re-sends the same hash periodically; only a new one means something changed.

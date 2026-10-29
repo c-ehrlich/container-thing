@@ -164,17 +164,24 @@ const getProjectFn = createServerFn({ method: "GET" })
   .handler(({ data, context }) => fetchProject(context.railway, data.projectId));
 
 /**
- * Every query about one project is keyed under this: the project itself, a service's page, and so on. So
- * invalidating it refreshes whatever about the project is on screen, after an action or a live push.
+ * Every query about one project is keyed under this: the project itself, a service's page, and so on.
+ * Invalidating it refreshes whatever about the project is on screen, on the pages and in the chat's
+ * widgets alike. That happens in three places, one for each way a project can change:
+ *
+ * - A button in the app: `useProjectMutation` (`domains/actions`), once the change succeeds.
+ * - A chat tool, which runs on the server: `useRefreshProjectWhen` (`domains/actions`), once the
+ *   browser sees the tool call finish.
+ * - Anything else, like Railway's dashboard, the CLI or a deploy finishing: live pushes
+ *   (`domains/live`). They also catch whatever the other two miss.
  */
 export const projectScope = (projectId: string) => ["project", projectId] as const;
 
 /**
  * The one cache entry for a project's environments, services and deployments: every page and the chat
  * widgets read it, so they always agree. Keyed under `projectScope`, so anything that refreshes a
- * project (an action, the chat after a tool call, Railway's live pushes) refreshes it. Railway allows as few as 1000 requests an hour
- * (Hobby) and the overview asks once per project, so beyond that it only refetches when you come back
- * to the tab, and every few seconds while a deploy is in flight.
+ * project refreshes it. Railway allows as few as 1000 requests an hour (Hobby) and the overview asks
+ * once per project, so beyond that it only refetches when you come back to the tab, and every few
+ * seconds while a deploy is in flight.
  */
 export const projectQuery = (projectId: string) =>
   queryOptions({

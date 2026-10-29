@@ -2,15 +2,13 @@ import { Button } from "@repo/ui/primitives/button";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@repo/ui/primitives/item";
 import { Skeleton } from "@repo/ui/primitives/skeleton";
 import { Spinner } from "@repo/ui/primitives/spinner";
-import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { isDataUIPart } from "ai";
-import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { Streamdown } from "streamdown";
 
+import { useRefreshProjectWhen } from "../../domains/actions";
 import type { ChatMessage } from "../../domains/assistant/tools";
-import { projectScope } from "../../domains/project/project";
 import { ServicesWidget, ServiceWidget, WidgetCard, WidgetError, WidgetHeading } from "./widgets";
 
 type Part = ChatMessage["parts"][number];
@@ -267,19 +265,6 @@ function StopServicePart(props: { part: ToolPart<"stopService">; onApproval: App
       part satisfies never;
       return null;
   }
-}
-
-/**
- * Tools run on the server, so the browser's cache doesn't know a start or stop just happened. Refetch
- * right away instead of waiting for Railway's push, which can take a few seconds.
- */
-function useRefreshProjectWhen(done: boolean, projectId: string | undefined) {
-  const queryClient = useQueryClient();
-  useEffect(() => {
-    if (done && projectId) {
-      void queryClient.invalidateQueries({ queryKey: projectScope(projectId) });
-    }
-  }, [done, projectId, queryClient]);
 }
 
 function ToolCaption(props: { pending?: boolean; children: ReactNode }) {
