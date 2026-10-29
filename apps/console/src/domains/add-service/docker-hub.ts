@@ -7,10 +7,20 @@ import { requireRailway } from "../../server/railway/require-railway";
 import { HubBudget } from "./hub-budget";
 
 /**
- * Docker Hub's public API. It needs no auth but sends no CORS headers, so the browser goes through
- * these server functions. Hub rate-limits per IP (180 requests per minute at the time of writing),
- * and every user shares the server's IP. So answers are cached for a week, and how eagerly we
- * refresh them depends on how much of the allowance is left (see `HubBudget`).
+ * Image and tag suggestions from Docker Hub's public API. It needs no auth but sends no CORS headers,
+ * so the browser goes through these server functions. Hub rate-limits per IP (180 requests per minute
+ * at the time of writing), and every user shares the server's IP.
+ *
+ * A search passes through these layers, in the order this file is written:
+ *
+ * 1. `image-field.tsx` waits until typing pauses for 250 ms.
+ * 2. The browser's query cache: the same search within 10 minutes (`HUB_STALE_TIME`) is answered
+ *    without asking the server, and the previous results stay up while the next ones load.
+ * 3. The server's cache (`cached`), shared by every user: an answer is kept for a week and returned
+ *    right away. Once it's older than `budget.refreshAfterMs()` (10 minutes, an hour or never,
+ *    depending on how much of Hub's allowance is left) it's also refreshed in the background.
+ *    Concurrent requests for the same key share one call to Hub.
+ * 4. `getJson`: calls Hub, refuses once the allowance is used up, and records what's left in `budget`.
  */
 const HUB = "https://hub.docker.com/v2";
 
@@ -33,28 +43,29 @@ const ImageSuggestion = z.object({
 });
 export type ImageSuggestion = z.infer<typeof ImageSuggestion>;
 
-const SearchResponse = z.object({
-  results: z.array(
-    z.object({
-      repo_name: z.string(),
-      short_description: z.string().nullish(),
-      pull_count: z.number().nullish(),
-      is_official: z.boolean().nullish(),
-    }),
-  ),
-});
+// 2. The browser's query cache.
 
-const TagsResponse = z.object({
-  results: z.array(z.object({ name: z.string() })),
-});
+const HUB_STALE_TIME = 10 * 60_000;
 
-async function getJson<T>(url: string, schema: z.ZodType<T>): Promise<T> {
-  if (budget.left() === 0) throw new Error("Docker Hub is busy. Try again in a minute.");
-  const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
-  budget.record(response);
-  if (!response.ok) throw new Error(`Docker Hub: HTTP ${response.status}`);
-  return schema.parse(await response.json());
-}
+export const imageSearchQuery = (query: string) =>
+  queryOptions({
+    queryKey: ["docker-hub", "search", query],
+    queryFn: () => searchImagesFn({ data: { query } }),
+    staleTime: HUB_STALE_TIME,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+
+export const imageTagsQuery = (repository: string, prefix: string) =>
+  queryOptions({
+    queryKey: ["docker-hub", "tags", repository, prefix],
+    queryFn: () => listTagsFn({ data: { repository, prefix } }),
+    staleTime: HUB_STALE_TIME,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+
+// 3. The server's cache.
 
 const searchImagesFn = createServerFn({ method: "GET" })
   .middleware([requireRailway])
@@ -92,25 +103,30 @@ const listTagsFn = createServerFn({ method: "GET" })
     });
   });
 
-const HUB_STALE_TIME = 10 * 60_000;
+// 4. Docker Hub.
 
-export const imageSearchQuery = (query: string) =>
-  queryOptions({
-    queryKey: ["docker-hub", "search", query],
-    queryFn: () => searchImagesFn({ data: { query } }),
-    staleTime: HUB_STALE_TIME,
-    placeholderData: keepPreviousData,
-    retry: false,
-  });
+const SearchResponse = z.object({
+  results: z.array(
+    z.object({
+      repo_name: z.string(),
+      short_description: z.string().nullish(),
+      pull_count: z.number().nullish(),
+      is_official: z.boolean().nullish(),
+    }),
+  ),
+});
 
-export const imageTagsQuery = (repository: string, prefix: string) =>
-  queryOptions({
-    queryKey: ["docker-hub", "tags", repository, prefix],
-    queryFn: () => listTagsFn({ data: { repository, prefix } }),
-    staleTime: HUB_STALE_TIME,
-    placeholderData: keepPreviousData,
-    retry: false,
-  });
+const TagsResponse = z.object({
+  results: z.array(z.object({ name: z.string() })),
+});
+
+async function getJson<T>(url: string, schema: z.ZodType<T>): Promise<T> {
+  if (budget.left() === 0) throw new Error("Docker Hub is busy. Try again in a minute.");
+  const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+  budget.record(response);
+  if (!response.ok) throw new Error(`Docker Hub: HTTP ${response.status}`);
+  return schema.parse(await response.json());
+}
 
 /** Shown before anything is typed. */
 export const POPULAR_IMAGES: ImageSuggestion[] = [

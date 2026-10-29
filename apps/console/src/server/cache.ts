@@ -12,7 +12,7 @@ export interface Cache {
 
 /**
  * A `Cache` in this process's memory. Each server instance has its own, and it's empty after a
- * restart. Once full, it drops the oldest entries first.
+ * restart. Once full, it drops the entry written longest ago. Reads don't count, so it isn't LRU.
  */
 export class MemoryCache implements Cache {
   readonly #entries = new Map<string, { value: unknown; expiresAt: number }>();
@@ -24,8 +24,12 @@ export class MemoryCache implements Cache {
 
   get(key: string): Promise<unknown> {
     const entry = this.#entries.get(key);
-    if (entry && entry.expiresAt <= Date.now()) this.#entries.delete(key);
-    return Promise.resolve(entry && entry.expiresAt > Date.now() ? entry.value : undefined);
+    if (!entry) return Promise.resolve(undefined);
+    if (entry.expiresAt <= Date.now()) {
+      this.#entries.delete(key);
+      return Promise.resolve(undefined);
+    }
+    return Promise.resolve(entry.value);
   }
 
   set(key: string, value: unknown, ttlMs: number): Promise<void> {

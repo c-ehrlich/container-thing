@@ -53,6 +53,8 @@ function keepEnvironmentLive(queryClient: QueryClient, projectId: string, enviro
     },
   });
 
+  // A loop, on purpose: the project's data says which deploys are in flight, their pushes refetch the
+  // project, and the new data says again. A deploy stops being followed once it lands.
   const unsubscribe = observer.subscribe((result) =>
     watch.setDeployments(deploysInFlight(result.data, environmentId)),
   );

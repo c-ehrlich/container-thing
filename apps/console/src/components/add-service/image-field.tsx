@@ -25,7 +25,8 @@ const pulls = new Intl.NumberFormat("en", { notation: "compact" });
 
 /**
  * The image input. Suggests popular images when empty and Docker Hub repositories while typing a name.
- * Any image works, including other registries we can't search. The tag has its own field.
+ * Any image works, including other registries we can't search. The tag has its own field. How
+ * searches are cached on the way to Docker Hub is described in `domains/add-service/docker-hub.ts`.
  */
 export function ImageField(props: { onPick?: (image: string) => void; className?: string }) {
   const field = useFieldContext<string>();
