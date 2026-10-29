@@ -28,7 +28,7 @@ railway config plan    # preview changes to the linked environment
 railway config apply   # apply them
 ```
 
-Secrets (`RAILWAY_OAUTH_CLIENT_ID`, `RAILWAY_OAUTH_CLIENT_SECRET`, `SESSION_SECRET`, `OPENROUTER_API_KEY`) are set in Railway as sealed variables. `APP_URL` defaults to the service's generated domain; register `<APP_URL>/auth/callback` on the Railway OAuth app.
+Secrets (`RAILWAY_OAUTH_CLIENT_ID`, `RAILWAY_OAUTH_CLIENT_SECRET`, `SESSION_SECRET`, `OPENROUTER_API_KEY`) are set in Railway as sealed variables. `APP_URL` defaults to the service's generated domain; register `<APP_URL>/auth/callback` on the Railway OAuth app. `OPENROUTER_MODEL` is optional and picks the chat assistant's model: any tool-capable model on OpenRouter, `anthropic/claude-haiku-5.5` by default.
 
 ## Tooling
 
