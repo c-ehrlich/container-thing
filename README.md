@@ -35,21 +35,19 @@ cp .env.example .env
 pnpm dev
 ```
 
-The console is at http://localhost:3000 and Storybook at http://localhost:6006. Sign in with Railway. If a variable is missing or invalid, the server's error names it.
+The console is at http://localhost:3000 and Storybook at http://localhost:6006.
 
-To try it without touching your real projects, switch the sidebar's **Railway data** menu to **Mock data**: a fake Railway (`packages/railway-mock`) with far more data than a real account, where deploys take a few seconds and nothing is deployed for real. It still needs the Railway sign-in, since templates come from the real API.
+To try it without touching your real projects, switch the sidebar's **Railway data** menu to **Mock data**: a fake Railway (`packages/railway-mock`).
 
 ## Repo layout
 
 ```
-apps/console           The console: TanStack Start app, including the chat assistant
+apps/console           The console: TanStack Start app
 packages/ui            UI library (shadcn/ui on Base UI)
 packages/form          TanStack Form wired to the field components in packages/ui
-packages/railway-mock  A fake Railway that runs in the console's server, behind "Mock data"
+packages/railway-mock  A fake Railway that runs in the console's server (much smaller functionality than real railway, only has the stuff that this console uses)
 docs/                  Design notes, e.g. how live updates work (realtime.md)
 ```
-
-The packages are consumed as TypeScript source, with no build step. Where code goes inside `apps/console` is described in `AGENTS.md`.
 
 ## Commands
 
@@ -74,34 +72,3 @@ railway config apply   # apply them
 ```
 
 Secrets (`RAILWAY_OAUTH_CLIENT_ID`, `RAILWAY_OAUTH_CLIENT_SECRET`, `SESSION_SECRET`, `OPENROUTER_API_KEY`) are set in Railway as sealed variables. `APP_URL` defaults to the service's generated domain; register `<APP_URL>/auth/callback` on the Railway OAuth app. `OPENROUTER_MODEL` is optional, as locally.
-
-## Tooling
-
-- **TypeScript** (v7): shared strict config in `tsconfig.base.json`. Each package extends it and runs `tsc` through Turbo.
-- **oxlint**: `.oxlintrc.json` at the root. Type-aware lint via `oxlint-tsgolint`. Warnings fail the run.
-- **oxfmt**: `.oxfmtrc.json` at the root. Also sorts imports and package.json.
-- Shared dependency versions live in the `catalog:` in `pnpm-workspace.yaml`.
-
-Lint and format run once from the root because they're fast enough not to need Turbo. Typecheck and build run per package through Turbo so results are cached.
-
-## UI package
-
-shadcn/ui components built on [Base UI](https://base-ui.com) (not Radix), `base-nova` preset. Each primitive lives in `packages/ui/src/primitives/<name>/` next to its story.
-
-```ts
-import { cn } from "@repo/ui/lib/utils";
-import { Button } from "@repo/ui/primitives/button";
-
-import "@repo/ui/styles.css"; // once, in the app's root stylesheet/entry
-```
-
-The components are copied from shadcn unchanged apart from import paths and formatting. Lint rules that flag upstream patterns are relaxed for `src/primitives` and `src/hooks` (see `.oxlintrc.json`), so updates from upstream stay easy to diff.
-
-To add a component, generate it in a scratch project and copy it in:
-
-```sh
-pnpm dlx shadcn@latest init -t vite -b base -p nova -n scratch
-cd scratch && pnpm dlx shadcn@latest add <name>
-# copy src/components/ui/<name>.tsx -> packages/ui/src/primitives/<name>/<name>.tsx
-# and rewrite `@/components/ui/x` imports to `../x/x`
-```
