@@ -9,17 +9,28 @@ import type { LatestDeployment } from "../domains/project/project";
 
 /** Color only where it matters: green when up, yellow on its way, red when broken. Off is gray. */
 const BADGE_VARIANT = {
-  running: "success",
+  running: "success", // Not used: running renders as a dot, see below.
   sleeping: "outline",
   pending: "warning",
   failed: "destructive",
   stopped: "muted",
 } as const satisfies Record<DeploymentState["kind"], string>;
 
-/** A service's status as shown everywhere in the app: project page and chat widgets alike. */
+/**
+ * A service's status as shown everywhere in the app: project page and chat widgets alike. Running is
+ * the normal case, so it's a dot and quiet text; a pill is kept for states that need a look.
+ */
 export function ServiceStatusBadge(props: { deployment: LatestDeployment | null }) {
   const { deployment } = props;
   const state = deploymentState(deployment);
+  if (state.kind === "running") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="size-1.5 rounded-full bg-success" />
+        {state.label}
+      </span>
+    );
+  }
   return (
     <Badge variant={BADGE_VARIANT[state.kind]}>
       {state.kind === "pending" && <Spinner />}
