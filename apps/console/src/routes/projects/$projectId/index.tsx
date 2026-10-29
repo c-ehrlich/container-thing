@@ -81,7 +81,7 @@ function ProjectPage() {
               search={{ environmentId: env.id }}
               className={cn(
                 "-mb-px flex items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground hover:text-foreground",
-                env.id === environment?.id && "border-primary font-medium text-foreground",
+                env.id === environment?.id && "border-primary-accent font-medium text-foreground",
               )}
             >
               <span

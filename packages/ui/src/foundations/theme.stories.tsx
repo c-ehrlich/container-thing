@@ -50,7 +50,7 @@ const pairs = [
   ["sidebar-accent", "sidebar-accent-foreground"],
 ] as const;
 
-const lines = ["border", "input", "ring", "sidebar-border"] as const;
+const lines = ["border", "input", "ring", "primary-accent", "sidebar-border"] as const;
 const charts = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"] as const;
 
 function Tokens() {
@@ -215,7 +215,7 @@ function Specimen() {
           </Alert>
           <p className="text-sm">
             Body text with <span className="text-muted-foreground">muted text</span> and{" "}
-            <a href="#theme" className="text-primary underline-offset-4 hover:underline">
+            <a href="#theme" className="text-primary-accent underline-offset-4 hover:underline">
               a link
             </a>
             .
