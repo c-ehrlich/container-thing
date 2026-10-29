@@ -11,7 +11,7 @@ import { TopologyDiagram } from "../../../components/overview/topology-diagram";
 import { ServiceTable } from "../../../components/project/service-table";
 import { KIND_DOT } from "../../../components/status-colors";
 import { useDismissed } from "../../../domains/insights/dismissed";
-import { healthOf, verdictOf } from "../../../domains/insights/health";
+import { healthOf } from "../../../domains/insights/health";
 import { insightsFor } from "../../../domains/insights/insights";
 import { pickEnvironment } from "../../../domains/project/environments";
 import { projectQuery } from "../../../domains/project/project";
@@ -45,18 +45,14 @@ function ProjectPage() {
       !dismissed.isDismissed(i.key) && (!i.service || i.service.environment.id === environment?.id),
   );
   const domains = environment?.services.flatMap((s) => s.domains) ?? [];
-  const verdict = verdictOf(healthOf(project, environment));
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-8 p-8">
       <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="grid gap-1">
           {workspace && <p className="text-sm text-muted-foreground">{workspace.name}</p>}
+          {/* No status line under the name: the environment tabs' dots and the insights say it. */}
           <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className={cn("size-2 rounded-full", KIND_DOT[verdict.kind])} />
-            {verdict.label}
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
           {domains.slice(0, 3).map((domain) => (
@@ -65,10 +61,10 @@ function ProjectPage() {
               href={`https://${domain}`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+              className="flex items-center gap-1 text-muted-foreground/80 hover:text-foreground"
             >
               {domain}
-              <ArrowUpRightIcon className="size-3.5" />
+              <ArrowUpRightIcon className="size-3 opacity-60" />
             </a>
           ))}
           <MonthlyCost usage={usage} />
@@ -101,8 +97,9 @@ function ProjectPage() {
       )}
 
       {environment && (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <DotGrid className="relative min-h-80 rounded-xl border">
+        // items-start: the diagram keeps its own height instead of stretching to the insights'.
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <DotGrid className="relative h-80 rounded-xl bg-muted/20">
             <TopologyDiagram
               project={project}
               environment={environment}
@@ -115,8 +112,11 @@ function ProjectPage() {
           </DotGrid>
 
           <section className="grid content-start gap-2">
-            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <h2 className="flex items-baseline gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Insights
+              {shown.length > 0 && (
+                <span className="text-muted-foreground/60 tabular-nums">{shown.length}</span>
+              )}
             </h2>
             {shown.length === 0 ? (
               <p className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
