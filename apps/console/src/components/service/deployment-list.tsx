@@ -1,7 +1,7 @@
 import { cn } from "@repo/ui/lib/utils";
 import { HistoryIcon } from "lucide-react";
 
-import { timeAgo } from "../../domains/insights/health";
+import { ago } from "../../domains/insights/health";
 import type { ServiceDeployment } from "../../domains/project/service";
 import { ActionButton } from "../action-button";
 import { ServiceStatusBadge } from "../service-status-badge";
@@ -49,7 +49,7 @@ export function DeploymentList(props: {
               </span>
               <span className="text-xs text-muted-foreground">
                 {deployment.creator ? `${deployment.creator} · ` : ""}
-                {timeAgo(deployment.createdAt)} ago
+                {ago(deployment.createdAt)}
               </span>
             </button>
             <div className="relative z-10 flex items-center gap-2">

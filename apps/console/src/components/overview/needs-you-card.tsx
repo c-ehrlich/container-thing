@@ -3,7 +3,7 @@ import { Button } from "@repo/ui/primitives/button";
 import { Link } from "@tanstack/react-router";
 import { CircleXIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 
-import { timeAgo } from "../../domains/insights/health";
+import { ago } from "../../domains/insights/health";
 import type { Insight } from "../../domains/insights/insights";
 import type { ProjectUsage } from "../../domains/project/usage";
 import { DotGrid } from "./dot-grid";
@@ -40,7 +40,7 @@ export function NeedsYouCard(props: {
               >
                 {project.name} / {service.environment.name}
               </Link>
-              {service.deployment && ` · ${timeAgo(service.deployment.createdAt)} ago`}
+              {service.deployment && ` · ${ago(service.deployment.createdAt)}`}
             </p>
             <p className="text-sm text-pretty text-muted-foreground">{insight.evidence}</p>
             {impact && (

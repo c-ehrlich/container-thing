@@ -13,7 +13,7 @@ import { MetricChart, formatCpu, formatMemory } from "../../../../components/ser
 import { ServiceActions } from "../../../../components/service/service-actions";
 import { KIND_DOT } from "../../../../components/status-colors";
 import { useDismissed } from "../../../../domains/insights/dismissed";
-import { timeAgo } from "../../../../domains/insights/health";
+import { ago } from "../../../../domains/insights/health";
 import { insightsFor } from "../../../../domains/insights/insights";
 import { deploymentState } from "../../../../domains/project/deployment-state";
 import { primaryEnvironment } from "../../../../domains/project/environments";
@@ -90,7 +90,7 @@ function ServicePage() {
             </div>
             <p className="text-sm text-muted-foreground">
               {project.name} / {environment.name}
-              {service.deployment && ` · deployed ${timeAgo(service.deployment.createdAt)} ago`}
+              {service.deployment && ` · deployed ${ago(service.deployment.createdAt)}`}
             </p>
           </div>
           <ServiceActions
@@ -187,7 +187,7 @@ function ServiceBody(props: {
             caption={
               selected.id === current?.id
                 ? "Current deployment"
-                : `Deployment from ${timeAgo(selected.createdAt)} ago`
+                : `Deployment from ${ago(selected.createdAt)}`
             }
           />
         ) : (
