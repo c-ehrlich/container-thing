@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>How “Login with Railway” works — Console walkthrough</title>
+    <title>How “Sign in with Railway” works — Console walkthrough</title>
     <style>
       :root {
         --bg: #0d0f14;
@@ -959,8 +959,10 @@
 
     <!-- ============================================================ INTRO -->
     <section id="intro" class="hero">
-      <div class="eyebrow">apps/console · commit b233bf9 “implement oauth”</div>
-      <h1>How <span class="grad">“Login with Railway”</span> works</h1>
+      <div class="eyebrow">
+        apps/console · written for commit b233bf9 “implement oauth”, updated for later changes
+      </div>
+      <h1>How <span class="grad">“Sign in with Railway”</span> works</h1>
       <p class="lede">
         Console doesn't have its own accounts or passwords. Railway signs the user in, and the user
         decides which Railway projects Console may manage. Console gets a token it can use to call
@@ -1473,7 +1475,7 @@ export const cookieDefaults = () => ({
         class="code"
         data-file="apps/console/src/routes/__root.tsx + server/railway/backend.ts + domains/project/viewer.ts"
       >const getShell = createServerFn({ method: "GET" }).handler(async () => {
-  const railway = await getRailway();                          // null → Home renders "Login with Railway"
+  const railway = await getRailway();                          // null → the root shows SignInScreen
   const viewer = railway ? await fetchViewer(railway) : null;
   return { viewer, backend: readBackend(), sidebarOpen: getCookie("sidebar_state") !== "false" };
 });
@@ -1513,7 +1515,7 @@ export async function fetchViewer(railway: RailwayClient) {
     <section id="fail">
       <div class="eyebrow">Chapter 10</div>
       <h2>When things go wrong</h2>
-      <p class="lede">Every failure path in the new code, and what the user sees.</p>
+      <p class="lede">Every failure path in the sign-in code, and what the user sees.</p>
       <div class="fail-list" id="faillist" style="margin-top: 16px"></div>
     </section>
 
@@ -1537,16 +1539,15 @@ export async function fetchViewer(railway: RailwayClient) {
           </p>
         </div>
         <div class="card">
-          <h3 style="margin-top: 0">🏁 Two tabs refreshing at once</h3>
+          <h3 style="margin-top: 0">🏁 Many requests refreshing at once</h3>
           <p class="muted">
-            If two requests arrive in the last minute before expiry, both will refresh. This can
-            even happen within one page load: the root loader (<code>getShell</code> in
-            <code>__root.tsx</code>) and then each project the home loader prefetches go through
-            <code>getRailway()</code> → <code>getFreshSession()</code>, and the prefetches run in
-            parallel. They all read the cookie the request arrived with, so none of them sees a
-            token another one just refreshed. If Railway rotates refresh tokens and rejects reuse of
-            an old one, the slower calls fail and those parts of the render show signed-out or
-            unavailable. The cookie written by the other call survives, so the next load is fine.
+            One page load fires several server functions at once (the root loader, then each project
+            the home loader prefetches), all carrying the same nearly expired cookie. Railway
+            rotates refresh tokens and rejects a used one, so if each refreshed on its own, only the
+            first would succeed. <code>refreshSession()</code> shares one refresh per refresh token
+            and keeps the result for 5 minutes, for requests that left the browser before the new
+            cookie arrived. That record lives in one server's memory, though: with more than one
+            server instance, two of them can still race, and the loser's request looks signed out.
           </p>
         </div>
         <div class="card">
@@ -1576,8 +1577,9 @@ export async function fetchViewer(railway: RailwayClient) {
           <h3 style="margin-top: 0">♻️ Failed refresh leaves the stale cookie</h3>
           <p class="muted">
             When a refresh fails, <code>getFreshSession()</code> returns <code>null</code> but
-            doesn't clear the cookie, so each page load retries the refresh until the user logs in
-            again. That's harmless, just one wasted request per load.
+            doesn't clear the cookie. The failure is remembered for 5 minutes like a success, then
+            the next request tries the same refresh token again, until the user signs in again.
+            That's harmless, just one wasted request every few minutes.
           </p>
         </div>
       </div>
@@ -1681,7 +1683,7 @@ export async function fetchViewer(railway: RailwayClient) {
           path: "routes/auth/login.ts",
           tag: "new",
           title: "GET /auth/login",
-          what: "The “Login with Railway” button links here. It does no rendering. It calls <code>startLogin()</code> and responds with a <b>302 redirect</b> to Railway's consent screen.",
+          what: "The “Sign in with Railway” button links here. It does no rendering. It calls <code>startLogin()</code> and responds with a <b>302 redirect</b> to Railway's consent screen.",
           why: "It has to be a server route because it sets cookies and needs secrets (client ID, redirect URI).",
           code: `export const Route = createFileRoute("/auth/login")({
   server: {
@@ -1718,7 +1720,7 @@ export async function fetchViewer(railway: RailwayClient) {
           path: "routes/__root.tsx",
           tag: "mod",
           title: "The root route",
-          what: "Its <b>loader</b> calls the <code>getShell</code> server function: <code>getRailway()</code> reads the session (refreshing it if needed), and <code>fetchViewer()</code> (in <code>domains/project/viewer.ts</code>) runs the <code>Viewer</code> query. Signed out (<code>viewer: null</code>), there's no app shell and the home page shows a Login link. Signed in, the sidebar lists your shared workspaces and has a Log out form.",
+          what: "Its <b>loader</b> calls the <code>getShell</code> server function: <code>getRailway()</code> reads the session (refreshing it if needed), and <code>fetchViewer()</code> (in <code>domains/project/viewer.ts</code>) runs the <code>Viewer</code> query. Signed out (<code>viewer: null</code>), there's no app shell: every page shows <code>SignInScreen</code>. Signed in, the sidebar lists your shared workspaces and has a Log out form.",
           why: "The loader runs before render, so the page never flashes “signed out” and then re-renders.",
           code: `const getShell = createServerFn({ method: "GET" }).handler(async () => {
   const railway = await getRailway();
@@ -1859,18 +1861,18 @@ APP_URL: z.url().default("http://localhost:3000"),`,
           {
             from: "S",
             to: "B",
-            label: "200 · “Login with Railway”",
+            label: "200 · “Sign in with Railway”",
             ch: "front",
             title: "Signed-out page",
-            text: "<code>getFreshSession()</code> finds no cookie and returns <code>null</code>, so <code>getRailway()</code> does too, <code>getShell()</code> returns <code>viewer: null</code>, and <code>Home</code> renders the login link.",
-            code: `if (!viewer) {\n  return (\n    <main className="grid min-h-svh place-content-center gap-4 text-center">\n      <a href="/auth/login" className={buttonVariants()}>Login with Railway</a>\n    </main>\n  );\n}`,
+            text: "<code>getFreshSession()</code> finds no cookie and returns <code>null</code>, so <code>getRailway()</code> does too, <code>getShell()</code> returns <code>viewer: null</code>, and the root route renders <code>SignInScreen</code> instead of the app.",
+            code: `// routes/__root.tsx\nif (!viewer) return <SignInScreen />;\n\n// components/shell/sign-in-screen.tsx\n<a href="/auth/login" className={buttonVariants({ size: "lg", className: "w-full" })}>\n  Sign in with Railway\n</a>`,
           },
           {
             from: "B",
             to: "S",
             label: "GET /auth/login",
             ch: "front",
-            title: "Click “Login with Railway”",
+            title: "Click “Sign in with Railway”",
             text: "A plain link, so a full-page navigation (not a fetch). We're about to leave the site, and the browser needs to follow redirects.",
           },
           {
@@ -2109,7 +2111,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
           {
             from: "S",
             to: "B",
-            label: "200 · “Login with Railway”",
+            label: "200 · “Sign in with Railway”",
             ch: "front",
             title: "Signed out",
             text: "Note that Console never told Railway. The tokens weren't revoked, they're just gone from this browser. See Trade-offs.",
@@ -2287,7 +2289,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
       const ST = {
         normal: {
           story:
-            "You clicked “Login with Railway” yourself. Console set a state cookie, Railway echoed the same state back.",
+            "You clicked “Sign in with Railway” yourself. Console set a state cookie, Railway echoed the same state back.",
           cookie: "Xq3vF9…kP2",
           url: "Xq3vF9…kP2",
           verdict: [
@@ -2585,7 +2587,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
         } else if (!hasRT) {
           v.className = "verdict no";
           v.innerHTML =
-            "🛑 Token is (nearly) expired and there's no refresh token. <code>getFreshSession()</code> → <b>null</b>. The user sees “Login with Railway”.";
+            "🛑 Token is (nearly) expired and there's no refresh token. <code>getFreshSession()</code> → <b>null</b>. The user sees “Sign in with Railway”.";
           hi = 3;
         } else if (!rtOk) {
           v.className = "verdict no";
@@ -2602,8 +2604,8 @@ APP_URL: z.url().default("http://localhost:3000"),`,
           "if (!session) return null;",
           "if (session.accessTokenExpiresAt - Date.now() > REFRESH_MARGIN_MS) return session;",
           "if (!session.refreshToken) return null;",
-          "try {\n  const tokens = await railwayOAuth().refreshAccessToken(TOKEN_ENDPOINT, session.refreshToken, []);\n  const refreshed = sessionFromTokens(tokens, session.refreshToken);\n  await writeSession(refreshed);\n  return refreshed;",
-          '} catch (cause) {\n  console.error("Railway token refresh failed", cause);\n  return null;\n}',
+          "const refreshed = await refreshSession(session.refreshToken);   // one refresh, shared by concurrent requests\nif (refreshed) await writeSession(refreshed);\nreturn refreshed;",
+          '// inside refreshSession, when Railway says no:\nconsole.error("Railway token refresh failed", cause);\nreturn null;',
         ];
         const el = $("#ck-code");
         el.dataset.raw = lines.map((l, i) => (i === hi ? `<mark>${l}</mark>` : l)).join("\n");
@@ -2664,7 +2666,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
         [
           "SESSION_SECRET is changed (rotated)",
           "everyone signed out",
-          "Every existing cookie fails to decrypt → <code>readSession()</code> returns <code>null</code>. Users just see the login button. It's the reset-everything switch.",
+          "Every existing cookie fails to decrypt → <code>readSession()</code> returns <code>null</code>. Users just see the sign-in screen. It's the reset-everything switch.",
         ],
         [
           "Cookie edited, truncated, or from an older Session shape",
@@ -2675,6 +2677,11 @@ APP_URL: z.url().default("http://localhost:3000"),`,
           "Access token expired and refresh fails",
           "signed out",
           "Logged as <i>“Railway token refresh failed”</i>, then <code>null</code>. The stale cookie stays until the next login overwrites it.",
+        ],
+        [
+          "The session ends while a tab is open (refresh token revoked, or signed out in another tab)",
+          "sign-in screen",
+          "The next server function answers 401 with <i>“Not signed in to Railway”</i>. The browser half of <code>requireRailway</code> recognises it and calls <code>goToSignIn()</code>, which reloads the page, so the root loader finds no session and shows <code>SignInScreen</code> instead of a page full of errors. The live connection does the same when <code>ensureLiveSession</code> reports signed out.",
         ],
         [
           "Railway's GraphQL API returns an error",

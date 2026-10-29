@@ -3,7 +3,7 @@
 The project page asks Railway for two things about a project: CPU and memory per service over the
 last day (`metrics`), and this month's estimated usage (`estimatedUsage`). Asked in one query with
 the console's OAuth token, Railway answered `Not Authorized`, so the page showed no usage at all.
-Asked as two queries, both succeed. `apps/console/src/domains/project/overview.ts` now sends two.
+Asked as two queries, both succeed. `apps/console/src/domains/project/usage.ts` now sends two.
 
 Seen on 2026-10-21 for project `bug-repros` (`adbd8ae2-27e2-4a4d-879a-2007c158a444`), through the
 console. The curls below send the same queries; we haven't yet run these exact curls.
