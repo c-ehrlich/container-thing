@@ -14,7 +14,9 @@ import { Link } from "@tanstack/react-router";
 import { CircleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { KIND_ORDER } from "../../domains/insights/health";
 import { useWatchEnvironments } from "../../domains/live";
+import { deploymentState } from "../../domains/project/deployment-state";
 import { projectQuery } from "../../domains/project/project";
 import type { Service } from "../../domains/project/project";
 import { ServiceStatusBadge } from "../service-status-badge";
@@ -73,16 +75,23 @@ export function ServiceListWidget(props: { projectId: string; environmentId: str
   return (
     <WidgetCard>
       <ItemGroup className="gap-0">
-        {environment.services.map((service) => (
-          <Item key={service.id} size="xs">
-            <ServiceSummary
-              service={service}
-              context={service.source ?? undefined}
-              projectId={projectId}
-              environmentId={environmentId}
-            />
-          </Item>
-        ))}
+        {/* Broken first, like the project page: a crash shouldn't sit between four healthy rows. */}
+        {environment.services
+          .toSorted(
+            (a, b) =>
+              KIND_ORDER.indexOf(deploymentState(a.deployment).kind) -
+              KIND_ORDER.indexOf(deploymentState(b.deployment).kind),
+          )
+          .map((service) => (
+            <Item key={service.id} size="xs">
+              <ServiceSummary
+                service={service}
+                context={service.source ?? undefined}
+                projectId={projectId}
+                environmentId={environmentId}
+              />
+            </Item>
+          ))}
       </ItemGroup>
     </WidgetCard>
   );

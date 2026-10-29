@@ -11,7 +11,7 @@ import { Sidebar, SidebarContent, SidebarHeader } from "@repo/ui/primitives/side
 import { Spinner } from "@repo/ui/primitives/spinner";
 import { useMatch } from "@tanstack/react-router";
 import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
-import { XIcon } from "lucide-react";
+import { ArrowUpIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
 import type { ChatMessage } from "../../domains/assistant/tools";
@@ -84,17 +84,18 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         <SidebarContent className="flex-col-reverse">
           <div className="grid gap-4 p-4">
             {messages.length === 0 && (
-              <div className="grid gap-2 text-sm text-muted-foreground">
-                <p>Ask me to list, start or stop your Railway services.</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="grid gap-4 text-sm">
+                <p className="text-muted-foreground">Ask me to list, start or stop services.</p>
+                <div className="grid gap-1">
                   {SUGGESTIONS.map((suggestion) => (
                     <Button
                       key={suggestion}
-                      size="sm"
-                      variant="outline"
+                      variant="ghost"
+                      className="justify-between bg-muted/40 font-normal"
                       onClick={() => send(suggestion)}
                     >
                       {suggestion}
+                      <ArrowUpIcon className="text-muted-foreground" />
                     </Button>
                   ))}
                 </div>
