@@ -110,103 +110,106 @@ function Overview(props: { viewer: Viewer }) {
     suggestions,
     dismissed: hidden,
     brokenProjects,
-    summary,
-  } = triage(loaded, { isDismissed: dismissed.isDismissed, projectCount: listed.length });
+  } = triage(loaded, { isDismissed: dismissed.isDismissed });
 
   return (
-    <div className="mx-auto grid w-full max-w-7xl gap-10 p-8 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <main className="@container grid content-start gap-10">
-        <header className="grid gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">{summary}</p>
-        </header>
+    // The rail sits beside the projects only when the page itself is wide enough, not the window:
+    // with the sidebar and assistant open, a wide window can still leave a narrow page.
+    <div className="@container mx-auto w-full max-w-7xl p-8">
+      <div className="grid gap-10 @5xl:grid-cols-[minmax(0,1fr)_320px]">
+        <main className="@container grid content-start gap-10">
+          {/* The section labels carry the counts; a sentence on top only repeated them. */}
+          <h1 className="sr-only">Projects</h1>
 
-        <section className="grid gap-3">
-          {needsYou.length > 0 ? (
-            <>
-              <SectionLabel>Needs you</SectionLabel>
-              {needsYou.map((insight) => (
-                <NeedsYouCard
-                  key={insight.key}
-                  insight={insight}
-                  usage={loaded.find((l) => l.project.id === insight.project.id)?.usage}
-                  onDismiss={() => dismissed.dismiss(insight.key)}
-                />
-              ))}
-            </>
-          ) : (
-            <div className="flex items-center gap-3 rounded-xl border border-dashed p-5 text-muted-foreground">
-              <CircleCheckIcon className="size-5 text-success" />
-              Nothing needs you right now.
-            </div>
-          )}
-          <ShowDismissed insights={hidden.needsYou} onRestore={dismissed.restore} />
-        </section>
-
-        {inFlight.length > 0 && (
-          <section className="grid gap-2">
-            <SectionLabel>In flight</SectionLabel>
-            {inFlight.map(({ project, service }) => {
-              const commit = service.deployment?.commitMessage;
-              return (
-                <div
-                  key={`${service.environment.id}-${service.id}`}
-                  className="flex items-center gap-3 px-1 text-sm"
-                >
-                  <Spinner className="size-4 text-warning" />
-                  <span className="font-medium">{service.name}</span>
-                  <span className="shrink-0 text-muted-foreground">
-                    {service.state.label.toLowerCase()} in {project.name} /{" "}
-                    {service.environment.name}
-                  </span>
-                  {commit && <span className="truncate text-muted-foreground/70">“{commit}”</span>}
-                  {service.deployment && (
-                    <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">
-                      {timeAgo(service.deployment.createdAt)}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </section>
-        )}
-
-        {props.viewer.workspaces.map((workspace) => {
-          const cards = workspace.projects.filter((p) => !brokenProjects.has(p.id));
-          if (cards.length === 0) return null;
-          return (
-            <section key={workspace.id} className="grid gap-3">
-              <SectionLabel>{workspace.name}</SectionLabel>
-              <div className="grid gap-4 @xl:grid-cols-2 @5xl:grid-cols-3">
-                {cards.map((listedProject) => {
-                  const index = listed.findIndex((p) => p.id === listedProject.id);
-                  const overview = overviews[index];
-                  return overview?.data ? (
-                    <ProjectCard
-                      key={listedProject.id}
-                      project={overview.data}
-                      usage={usages[index]?.data}
-                    />
-                  ) : (
-                    <UnavailableCard
-                      key={listedProject.id}
-                      name={listedProject.name}
-                      error={overview?.error?.message}
-                    />
-                  );
-                })}
+          <section className="grid gap-3">
+            {needsYou.length > 0 ? (
+              <>
+                <SectionLabel count={needsYou.length}>Needs you</SectionLabel>
+                {needsYou.map((insight) => (
+                  <NeedsYouCard
+                    key={insight.key}
+                    insight={insight}
+                    usage={loaded.find((l) => l.project.id === insight.project.id)?.usage}
+                    onDismiss={() => dismissed.dismiss(insight.key)}
+                  />
+                ))}
+              </>
+            ) : (
+              <div className="flex items-center gap-3 rounded-xl border border-dashed p-5 text-muted-foreground">
+                <CircleCheckIcon className="size-5 text-success" />
+                Nothing needs you right now.
               </div>
-            </section>
-          );
-        })}
-      </main>
+            )}
+            <ShowDismissed insights={hidden.needsYou} onRestore={dismissed.restore} />
+          </section>
 
-      <InsightsPanel
-        insights={suggestions}
-        onDismiss={(insight) => dismissed.dismiss(insight.key)}
-        className="xl:sticky xl:top-20 xl:self-start"
-        footer={<ShowDismissed insights={hidden.suggestions} onRestore={dismissed.restore} />}
-      />
+          {inFlight.length > 0 && (
+            <section className="grid gap-2">
+              <SectionLabel count={inFlight.length}>In flight</SectionLabel>
+              {inFlight.map(({ project, service }) => {
+                const commit = service.deployment?.commitMessage;
+                return (
+                  <div
+                    key={`${service.environment.id}-${service.id}`}
+                    className="flex items-center gap-3 px-1 text-sm"
+                  >
+                    <Spinner className="size-4 text-warning" />
+                    <span className="font-medium">{service.name}</span>
+                    <span className="shrink-0 text-muted-foreground">
+                      {service.state.label.toLowerCase()} in {project.name} /{" "}
+                      {service.environment.name}
+                    </span>
+                    {commit && (
+                      <span className="truncate text-muted-foreground/70">“{commit}”</span>
+                    )}
+                    {service.deployment && (
+                      <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">
+                        {timeAgo(service.deployment.createdAt)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </section>
+          )}
+
+          {props.viewer.workspaces.map((workspace) => {
+            const cards = workspace.projects.filter((p) => !brokenProjects.has(p.id));
+            if (cards.length === 0) return null;
+            return (
+              <section key={workspace.id} className="grid gap-3">
+                <SectionLabel count={cards.length}>{workspace.name}</SectionLabel>
+                <div className="grid gap-4 @xl:grid-cols-2 @5xl:grid-cols-3">
+                  {cards.map((listedProject) => {
+                    const index = listed.findIndex((p) => p.id === listedProject.id);
+                    const overview = overviews[index];
+                    return overview?.data ? (
+                      <ProjectCard
+                        key={listedProject.id}
+                        project={overview.data}
+                        usage={usages[index]?.data}
+                      />
+                    ) : (
+                      <UnavailableCard
+                        key={listedProject.id}
+                        name={listedProject.name}
+                        error={overview?.error?.message}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </main>
+
+        <InsightsPanel
+          insights={suggestions}
+          onDismiss={(insight) => dismissed.dismiss(insight.key)}
+          className="@5xl:sticky @5xl:top-20 @5xl:self-start"
+          footer={<ShowDismissed insights={hidden.suggestions} onRestore={dismissed.restore} />}
+        />
+      </div>
     </div>
   );
 }
@@ -237,10 +240,13 @@ function UnavailableCard(props: { name: string; error?: string }) {
   );
 }
 
-function SectionLabel(props: { children: React.ReactNode }) {
+function SectionLabel(props: { children: React.ReactNode; count?: number }) {
   return (
-    <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+    <h2 className="flex items-baseline gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
       {props.children}
+      {props.count !== undefined && (
+        <span className="text-muted-foreground/60 tabular-nums">{props.count}</span>
+      )}
     </h2>
   );
 }
