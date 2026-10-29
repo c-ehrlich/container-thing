@@ -116,7 +116,7 @@ function ServiceRow(props: {
           <>
             {/* A line needs two samples; a service started minutes ago may only have one. */}
             {usage && usage.cpu.length > 1 && (
-              <Sparkline values={usage.cpu} className="hidden text-primary @4xl:block" />
+              <Sparkline values={usage.cpu} className="hidden text-primary-accent @4xl:block" />
             )}
             <span className="ml-auto text-xs whitespace-nowrap tabular-nums">{formatCpu(cpu)}</span>
           </>
