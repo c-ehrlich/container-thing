@@ -34,8 +34,7 @@ const TemplateSuggestion = z.object({
 });
 export type TemplateSuggestion = z.infer<typeof TemplateSuggestion>;
 
-// Railway's API allows as little as 100 requests an hour (Free plan), and templates rarely change,
-// so suggestions are shared between users and refreshed daily. Per server process, like Docker Hub's.
+// Share suggestions between users
 const DAY = 24 * 60 * 60_000;
 const cached = createCachedLoader(new MemoryCache({ maxEntries: 1_000 }), { keepMs: 7 * DAY });
 

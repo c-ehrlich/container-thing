@@ -14,7 +14,11 @@ import { HubBudget } from "./hub-budget";
  */
 const HUB = "https://hub.docker.com/v2";
 
-// Per server process. A Redis-backed `Cache` here would share it between instances.
+// In memory is fine as long as we run on one replica (we have only a single
+// outbound IP) and don't need to store too many entries.
+//
+// If either of those stops being true, a redis cache would be better. But
+// for now let's skip the network hop.
 const cached = createCachedLoader(new MemoryCache({ maxEntries: 5_000 }), {
   keepMs: 7 * 24 * 60 * 60_000,
 });
