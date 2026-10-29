@@ -24,13 +24,14 @@ export function NeedsYouCard(props: {
   const dependents = impact?.dependents ?? [];
 
   return (
-    <article className="relative grid overflow-hidden rounded-xl border border-destructive/30 bg-destructive/5 @2xl:grid-cols-[minmax(0,1fr)_320px]">
+    // A red tint marks the outage; the icon, the diagram and the section label say the rest.
+    <article className="relative grid overflow-hidden rounded-xl bg-destructive/6 @2xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="grid content-start gap-3 p-4">
         <div className="flex gap-3">
           <CircleXIcon className="mt-0.5 size-5 shrink-0 text-destructive" />
           <div className="grid min-w-0 gap-1 pr-6">
-            <p className="font-medium text-pretty">{insight.headline}</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="font-semibold text-pretty">{insight.headline}</p>
+            <p className="text-sm text-muted-foreground/70">
               <Link
                 to="/projects/$projectId"
                 params={{ projectId: project.id }}
@@ -57,7 +58,7 @@ export function NeedsYouCard(props: {
         </div>
         <InsightButtons insight={insight} className="pl-8" />
       </div>
-      <DotGrid className="relative min-h-44 border-t border-destructive/20 @2xl:border-t-0 @2xl:border-l">
+      <DotGrid className="relative min-h-44 bg-background/40">
         <TopologyDiagram
           project={project}
           environment={service.environment}

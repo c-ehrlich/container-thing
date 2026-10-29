@@ -21,8 +21,6 @@ export type Triage = {
   dismissed: { needsYou: Insight[]; suggestions: Insight[] };
   /** Projects with a card under "Needs you", which aren't repeated as a project card. */
   brokenProjects: Set<string>;
-  /** The page's state in one sentence. */
-  summary: string;
 };
 
 /**
@@ -31,12 +29,7 @@ export type Triage = {
  */
 export function triage(
   projects: { project: Project; usage?: ProjectUsage }[],
-  options: {
-    isDismissed: (key: string) => boolean;
-    /** All listed projects, including ones that didn't load. */
-    projectCount: number;
-    now?: number;
-  },
+  options: { isDismissed: (key: string) => boolean; now?: number },
 ): Triage {
   const insights = insightsFor(projects, options.now);
   const visible = insights.filter((i) => !options.isDismissed(i.key));
@@ -60,19 +53,5 @@ export function triage(
       suggestions: hidden.filter((i) => !isFailure(i)),
     },
     brokenProjects: new Set(needsYou.map((i) => i.project.id)),
-    summary: summary(needsYou.length, inFlight.length, options.projectCount),
   };
-}
-
-function summary(broken: number, inFlight: number, total: number) {
-  const parts = [];
-  if (broken > 0) parts.push(`${broken} ${broken === 1 ? "thing needs" : "things need"} you`);
-  if (inFlight > 0) parts.push(`${inFlight} ${inFlight === 1 ? "deploy" : "deploys"} in flight`);
-  parts.push(
-    broken + inFlight === 0
-      ? `${total === 1 ? "your project is" : `all ${total} projects are`} fine`
-      : "everything else is fine",
-  );
-  const sentence = parts.join(", ");
-  return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`;
 }

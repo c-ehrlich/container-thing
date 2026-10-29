@@ -75,21 +75,22 @@ export function InsightItem(props: { insight: Insight; onDismiss: () => void }) 
   const { insight } = props;
   const { icon: Icon, className } = ICON[insight.severity];
   return (
+    // Background tints instead of borders: red for a crash, a quiet panel for the rest.
     <article
       className={cn(
-        "relative grid gap-2 rounded-xl border bg-card/60 p-3",
-        insight.severity === "critical" && "border-destructive/30 bg-destructive/5",
+        "relative grid gap-3 rounded-lg bg-muted/40 p-3",
+        insight.severity === "critical" && "bg-destructive/6",
       )}
     >
       <div className="flex gap-2.5">
         <Icon className={cn("mt-0.5 size-4 shrink-0", className)} />
         <div className="grid min-w-0 gap-1">
           <p className="pr-6 text-sm leading-snug font-medium text-pretty">{insight.headline}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground/70">
             {insight.project.name}
             {insight.service && ` / ${insight.service.environment.name}`}
           </p>
-          <p className="text-xs leading-relaxed text-pretty text-muted-foreground">
+          <p className="text-sm leading-relaxed text-pretty text-muted-foreground">
             {insight.evidence}
             {insight.impact && insight.impact.dependents.length > 0 && ` ${insight.impact.text}`}
           </p>
