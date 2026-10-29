@@ -68,6 +68,7 @@ export function ServiceActions(props: Target) {
         <ActionButton
           projectId={projectId}
           label="Stop"
+          variant="ghost"
           icon={<SquareIcon data-icon="inline-start" />}
           title="Removes the running deployment. Start deploys it again."
           action={{ kind: "remove", deploymentId: deployment.id }}

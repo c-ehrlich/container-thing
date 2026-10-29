@@ -54,8 +54,9 @@ export function DeploymentList(props: {
             </button>
             <div className="relative z-10 flex items-center gap-2">
               {current && <span className="text-xs text-muted-foreground">Current</span>}
-              {/* Replaced deploys end up REMOVED; "Stopped" would suggest someone stopped them. */}
-              {!current && deployment.status === "REMOVED" ? (
+              {/* Replaced deploys end up REMOVED; "Stopped" would suggest someone stopped them.
+                  The current one's status is already next to the page title. */}
+              {current ? null : deployment.status === "REMOVED" ? (
                 <span className="text-xs text-muted-foreground">Removed</span>
               ) : (
                 <ServiceStatusBadge deployment={deployment} />

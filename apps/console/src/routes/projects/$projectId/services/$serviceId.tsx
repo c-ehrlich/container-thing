@@ -162,25 +162,17 @@ function ServiceBody(props: {
     detail.deployments.find((d) => d.id === selectedId) ?? current ?? detail.deployments[0];
   const selectedKind = selected ? deploymentState(selected).kind : "stopped";
 
+  const where = [
+    detail.replicas !== null &&
+      `${detail.replicas} ${detail.replicas === 1 ? "replica" : "replicas"}`,
+    detail.region && `in ${detail.region}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="grid min-w-0 content-start gap-8">
-        <div className="grid gap-4 md:grid-cols-2">
-          <MetricChart
-            label="CPU"
-            samples={detail.metrics.cpu}
-            limit={detail.metrics.cpuLimit}
-            format={formatCpu}
-            color="var(--chart-2)"
-          />
-          <MetricChart
-            label="Memory"
-            samples={detail.metrics.memoryGb}
-            limit={detail.metrics.memoryLimitGb}
-            format={formatMemory}
-            color="var(--chart-3)"
-          />
-        </div>
         {selected ? (
           <LogViewer
             key={selected.id}
@@ -201,11 +193,29 @@ function ServiceBody(props: {
         ) : (
           <p className="text-sm text-muted-foreground">No deployments, so no logs yet.</p>
         )}
+        <div className="grid gap-4 md:grid-cols-2">
+          <MetricChart
+            label="CPU"
+            samples={detail.metrics.cpu}
+            limit={detail.metrics.cpuLimit}
+            format={formatCpu}
+            color="var(--chart-2)"
+          />
+          <MetricChart
+            label="Memory"
+            samples={detail.metrics.memoryGb}
+            limit={detail.metrics.memoryLimitGb}
+            format={formatMemory}
+            color="var(--chart-3)"
+          />
+        </div>
       </div>
 
       <aside className="grid content-start gap-8">
         <section className="grid gap-3">
-          <h2 className="text-sm font-medium">Deployments</h2>
+          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Deployments
+          </h2>
           <DeploymentList
             projectId={props.projectId}
             deployments={detail.deployments}
@@ -214,56 +224,53 @@ function ServiceBody(props: {
             onSelect={setSelectedId}
           />
         </section>
-        <section className="grid gap-3">
-          <h2 className="text-sm font-medium">Settings</h2>
-          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm">
-            <Setting label="Source">
-              <span className="truncate font-mono text-xs">{detail.source ?? "None"}</span>
-            </Setting>
-            {detail.region && <Setting label="Region">{detail.region}</Setting>}
-            {detail.replicas !== null && <Setting label="Replicas">{detail.replicas}</Setting>}
-            <Setting label="Serverless">
-              {detail.sleepApplication ? "Sleeps when idle" : "Always on"}
-            </Setting>
-            {detail.cronSchedule && (
-              <Setting label="Cron">
-                <span className="font-mono text-xs">{detail.cronSchedule}</span>
-                {detail.nextCronRunAt &&
-                  ` · next ${new Date(detail.nextCronRunAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`}
-              </Setting>
-            )}
-            <Setting label="Domains">
-              {detail.domains.length === 0 ? (
-                <span className="text-muted-foreground">None</span>
-              ) : (
-                <span className="grid gap-1">
-                  {detail.domains.map((domain) => (
-                    <a
-                      key={domain}
-                      href={`https://${domain}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex min-w-0 items-center gap-1.5 hover:underline"
-                    >
-                      <GlobeIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{domain}</span>
-                    </a>
-                  ))}
+        <section className="grid gap-3 text-sm">
+          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Settings
+          </h2>
+          <p className="truncate font-mono text-xs">{detail.source ?? "No source"}</p>
+          <p>
+            {where && <span>{where} · </span>}
+            <span className="text-muted-foreground">
+              {detail.sleepApplication ? "sleeps when idle" : "always on"}
+            </span>
+          </p>
+          {detail.cronSchedule && (
+            <p>
+              Runs on <span className="font-mono text-xs">{detail.cronSchedule}</span>
+              {detail.nextCronRunAt && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · next{" "}
+                  {new Date(detail.nextCronRunAt).toLocaleString([], {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
                 </span>
               )}
-            </Setting>
-          </dl>
+            </p>
+          )}
+          {detail.domains.length === 0 ? (
+            <p className="text-muted-foreground">No public domain</p>
+          ) : (
+            <ul className="grid gap-1">
+              {detail.domains.map((domain) => (
+                <li key={domain}>
+                  <a
+                    href={`https://${domain}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-w-0 items-center gap-1.5 hover:underline"
+                  >
+                    <GlobeIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{domain}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </aside>
     </div>
-  );
-}
-
-function Setting(props: { label: string; children: React.ReactNode }) {
-  return (
-    <>
-      <dt className="text-muted-foreground">{props.label}</dt>
-      <dd className="flex min-w-0 items-center">{props.children}</dd>
-    </>
   );
 }
