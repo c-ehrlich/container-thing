@@ -55,7 +55,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootLayout() {
   const { viewer, backend, sidebarOpen } = Route.useLoaderData();
-  const [chatOpen, setChatOpen] = useState(true);
+  // Closed by default: open, it takes 384px from every page, which squeezes tables and logs.
+  const [chatOpen, setChatOpen] = useState(false);
 
   // ⌘I toggles the assistant, next to the sidebar's ⌘B.
   useEffect(() => {
