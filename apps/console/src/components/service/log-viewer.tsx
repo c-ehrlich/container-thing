@@ -109,7 +109,7 @@ function LogLines(props: { lines: LogLine[]; empty: React.ReactNode }) {
         const el = e.currentTarget;
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       }}
-      className="h-96 overflow-auto rounded-xl border bg-black/30 p-3 font-mono text-xs leading-relaxed"
+      className="h-[30rem] overflow-auto rounded-xl bg-black/30 p-3 font-mono text-xs leading-relaxed"
     >
       {props.lines.length === 0 ? (
         <div className="grid h-full place-items-center font-sans text-sm text-muted-foreground">
