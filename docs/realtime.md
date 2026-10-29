@@ -41,11 +41,11 @@ holding the token. A thin WebSocket relay that injects the token into `connectio
 `subscribe` through keeps one protocol end to end, lets the client subscribe and unsubscribe on one
 socket, and keeps queries and mutations in server functions. The relay closes the socket before the
 access token expires; the client reconnects and the new upgrade request reads the refreshed cookie.
-Fallback if Nitro WebSockets don't work under TanStack Start: an SSE route.
+The fallback, had Nitro WebSockets not worked under TanStack Start, was an SSE route; they work.
 
 **Discovering deployments started elsewhere: `canvasInvalidation`** 🐉🐉🐉. Undocumented and on the
 internal endpoint, so: typed by hand and validated with Zod, and if the subscription errors, fall back to
-polling `deployments` every 30 s. Product feedback for Railway: a public `environmentChanged`
+refetching the project every 30 s. Product feedback for Railway: a public `environmentChanged`
 subscription would let third-party apps match the dashboard.
 
 _Measured:_ Railway **completes `canvasInvalidation` after exactly 95 s** (14 pushes), even on a direct
@@ -61,6 +61,8 @@ Before we handled this, tabs silently stopped noticing outside changes after 95 
 **State: one writer per piece of data.** Pushes are signals; the server stays the source of truth.
 
 ## Phases
+
+Only phase 1 is built. Phases 2 and 3 are possible next steps, not current behavior.
 
 1. **Refetch only.** Relay + `canvasInvalidation` (polling fallback). Per-deployment events trigger a
    debounced (~250 ms) refetch. TanStack Query holds all state.

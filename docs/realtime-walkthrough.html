@@ -1566,7 +1566,9 @@
           <span
             >Start/Stop buttons send a <b>mutation</b> through a server function. When it succeeds,
             the page doesn't edit the cache by hand. It marks the cache entry as out of date
-            (“invalidates” it), which triggers a fresh read.</span
+            (“invalidates” it), which triggers a fresh read. The chat's start and stop tools run on
+            the server instead, so the chat invalidates the same entry once it sees a tool call
+            finish.</span
           >
         </div>
         <div class="row">
@@ -1709,11 +1711,16 @@ function ProjectPage() {
       <pre
         class="code"
         data-file="server/railway/require-railway.ts + domains/project/project.ts"
-      >export const requireRailway = createMiddleware({ type: "function" }).server(async ({ next }) => {
-  const railway = <mark>await getRailway()</mark>;   // fresh session + real or mock backend
-  if (!railway) { setResponseStatus(401); throw new Error("Not signed in to Railway"); }
-  return next({ context: { railway } });
-});
+      >export const requireRailway = createMiddleware({ type: "function" })
+  .client(async ({ next }) => {   // in the browser: signed out → reload into the sign-in screen
+    try { return await next(); }
+    catch (error) { if (isSignedOutError(error)) goToSignIn(); throw error; }
+  })
+  .server(async ({ next }) => {
+    const railway = <mark>await getRailway()</mark>;   // fresh session + real or mock backend
+    if (!railway) { setResponseStatus(401); throw new Error(SIGNED_OUT_MESSAGE); }
+    return next({ context: { railway } });
+  });
 
 const getProjectFn = createServerFn({ method: "GET" })
   .middleware([requireRailway])
@@ -1999,7 +2006,7 @@ onStatus: ({ mode }) => {
       <pre class="code" data-file="domains/live/environment.ts">next: (data) => {
   const parsed = CanvasInvalidation.safeParse(data);   // hand-typed, so validate it
   if (!parsed.success) return failCanvas();
-  canvasFailed = false;
+  canvasErrored = false;
   lastPushAt = Date.now();                             // feeds the 30 s watchdog
   setCanvasAvailable(true);
   // Railway re-sends the same hash periodically; only a new one means something changed.
@@ -2528,14 +2535,22 @@ export const projectQuery = (projectId: string) =>
         {
           path: "domains/actions/use-railway-action.ts",
           title: "Every write, then one refresh",
-          what: "Every change the console makes goes through <code>domains/actions</code>: <code>RailwayAction</code> lists what buttons can do (restart, rollback, cancel, remove, deploy, remove-service), <code>runActionFn</code> runs one on the server, and <code>ActionButton</code> renders one. <code>useRailwayAction</code> and <code>useProjectMutation</code> invalidate <code>projectScope</code> afterwards, and only settle once the refetch is done.",
-          why: "Invalidating in one place means no button can forget to, and every screen showing the project agrees afterwards.",
+          what: "Every change the console makes goes through <code>domains/actions</code>: <code>RailwayAction</code> lists what buttons can do (restart, rollback, cancel, remove, deploy, remove-service), <code>runActionFn</code> runs one on the server, and <code>ActionButton</code> renders one. <code>useRailwayAction</code> and <code>useProjectMutation</code> invalidate <code>projectScope</code> afterwards, and only settle once the refetch is done. The chat's tools change Railway on the server, where the browser can't see it, so the chat calls <code>useRefreshProjectWhen</code> once a tool call finishes, which invalidates the same key.",
+          why: "Invalidating in one place means no button can forget to, and every screen showing the project agrees afterwards. The comment on <code>projectScope</code> lists all three ways a project gets refreshed: buttons, chat tools and live pushes.",
           code: `export function useProjectMutation<TVariables, TData>(projectId, mutationFn) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: projectScope(projectId) }),
   });
+}
+
+// For changes made on the server, like the chat's tools.
+export function useRefreshProjectWhen(done: boolean, projectId: string | undefined) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (done && projectId) void queryClient.invalidateQueries({ queryKey: projectScope(projectId) });
+  }, [done, projectId, queryClient]);
 }`,
         },
         {
@@ -2560,13 +2575,18 @@ export const projectQuery = (projectId: string) =>
         {
           path: "server/railway/require-railway.ts",
           title: "Signed-in-only middleware",
-          what: "Server-function middleware: get a fresh session (refreshing the token if under a minute is left), or answer 401. On success it adds <code>context.railway</code>, a typed GraphQL client using the user's token, or the in-process mock if this browser picked it in the sidebar.",
-          why: "Every server function that talks to Railway needs the same check, so it's written once.",
-          code: `export const requireRailway = createMiddleware({ type: "function" }).server(async ({ next }) => {
-  const railway = await getRailway();
-  if (!railway) { setResponseStatus(401); throw new Error("Not signed in to Railway"); }
-  return next({ context: { railway } });
-});`,
+          what: "Server-function middleware: get a fresh session (refreshing the token if under a minute is left), or answer 401. On success it adds <code>context.railway</code>, a typed GraphQL client using the user's token, or the in-process mock if this browser picked it in the sidebar. Its browser half watches for that 401: if the session ended while the tab was open, it reloads the page, and the root loader shows the sign-in screen.",
+          why: "Every server function that talks to Railway needs the same check, so it's written once. Without the browser half, an expired session would leave a page full of errors.",
+          code: `export const requireRailway = createMiddleware({ type: "function" })
+  .client(async ({ next }) => {
+    try { return await next(); }
+    catch (error) { if (isSignedOutError(error)) goToSignIn(); throw error; }
+  })
+  .server(async ({ next }) => {
+    const railway = await getRailway();
+    if (!railway) { setResponseStatus(401); throw new Error(SIGNED_OUT_MESSAGE); }
+    return next({ context: { railway } });
+  });`,
         },
         {
           path: "routes/index.tsx",
@@ -3388,7 +3408,7 @@ export function getRequestCookie(request: Request, name: string): string | undef
               label: "first subscribe() → connect",
               title: "Lazy: no socket until it's needed",
               text: "The page mounts, and <code>useWatchEnvironments</code> starts <code>keepEnvironmentLive</code>, whose <code>watchEnvironment</code> calls <code>transport.subscribe(CANVAS_INVALIDATION, …)</code>. That's the first subscription, so the graphql-ws client starts connecting. Before connecting, it calls our <code>url</code> function.",
-              code: `url: async () => {\n  const { signedIn } = await ensureLiveSession();\n  if (!signedIn) { setConnection("signed-out"); throw new SignedOutError(…); }\n  return "ws://localhost:3000/api/live";\n},`,
+              code: `url: async () => {\n  const { signedIn } = await ensureLiveSession();\n  if (!signedIn) { setConnection("signed-out"); goToSignIn(); throw new SignedOutError(…); }\n  return "ws://localhost:3000/api/live";\n},`,
               file: "domains/live/relay-client.ts",
             },
             {
@@ -3405,7 +3425,7 @@ export function getRequestCookie(request: Request, name: string): string | undef
               ch: "http",
               label: "{ signedIn: true } (+ Set-Cookie)",
               title: "Cookie is fresh",
-              text: "If the token was refreshed, the response updates the session cookie. If the user is signed out, the client stops here and won't retry.",
+              text: "If the token was refreshed, the response updates the session cookie. If the user is signed out, the client stops here, won't retry, and reloads the page into the sign-in screen.",
             },
             {
               from: "B",
@@ -4525,7 +4545,11 @@ export function getRequestCookie(request: Request, name: string): string | undef
             "reconnecting",
             "Dropped. graphql-ws is retrying (forever, with backoff).",
           ],
-          ["signed-out", "signed-out", "<code>ensureLiveSession</code> said no. Retrying stops."],
+          [
+            "signed-out",
+            "signed-out",
+            "<code>ensureLiveSession</code> said no. Retrying stops, and the page reloads into the sign-in screen.",
+          ],
         ];
         const CANVAS = [
           ["ok", "pushing hashes", true, "Hashes arrive at least every ~8 s."],
@@ -4582,7 +4606,7 @@ export function getRequestCookie(request: Request, name: string): string | undef
               canvasAvailable = <b class="${cv[2] ? "good" : "bad"}">${cv[2]}</b> · connection === "connected" = <b class="${conn === "connected" ? "good" : "bad"}">${conn === "connected"}</b><br>
               mode = <b>"${live ? "live" : "polling"}"</b> → refetchInterval: <b>${live ? "the query's own" : "30_000"}</b></div>
             <p style="margin:4px 0"><b>Connection:</b> ${cn[2]}</p><p style="margin:4px 0"><b>canvasInvalidation:</b> ${cv[3]}</p>
-            ${conn === "signed-out" ? `<p style="margin:4px 0" class="bad">Polling won't help much here: <code>getProjectFn</code> goes through <code>requireRailway</code>, so the refetches fail with 401 too.</p>` : ""}
+            ${conn === "signed-out" ? `<p style="margin:4px 0" class="bad">In practice you won't stay here: the page reloads into the sign-in screen. Polling wouldn't help anyway, since <code>getProjectFn</code> goes through <code>requireRailway</code> and would fail with 401 too.</p>` : ""}
             ${!live && conn === "connected" ? `<p style="margin:4px 0" class="muted"><code>deployment(id)</code> subscriptions may still be pushing. They still trigger refetches, but they can't see new deployments, which is why their pushes alone don't count as live.</p>` : ""}`;
         }
         render();
@@ -4626,7 +4650,7 @@ export function getRequestCookie(request: Request, name: string): string | undef
           [
             "User signs out / refresh token revoked",
             "signed-out, stop retrying",
-            "<code>ensureLiveSession</code> returns <code>signedIn: false</code>, and <code>url()</code> throws a <code>SignedOutError</code>, which <code>shouldRetry</code> rejects. The upgrade would have been refused with 401 anyway.",
+            "<code>ensureLiveSession</code> returns <code>signedIn: false</code>, and <code>url()</code> throws a <code>SignedOutError</code>, which <code>shouldRetry</code> rejects. The upgrade would have been refused with 401 anyway. Before throwing, <code>url()</code> calls <code>goToSignIn()</code>, which reloads the page so the root loader shows the sign-in screen.",
           ],
           [
             "A <code>deployment(id)</code> subscription errors",
