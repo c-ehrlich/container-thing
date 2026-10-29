@@ -12,6 +12,7 @@ import { z } from "zod";
 import { assistantSettings } from "../../domains/assistant/assistant";
 import { ChatContext } from "../../domains/assistant/prompt";
 import type { ChatMessage } from "../../domains/assistant/tools";
+import { SIGNED_OUT_MESSAGE } from "../../lib/sign-in";
 import { env } from "../../server/env";
 import { getRailway } from "../../server/railway/backend";
 
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/api/chat")({
     handlers: {
       POST: async ({ request }) => {
         const railway = await getRailway();
-        if (!railway) return new Response("Not signed in", { status: 401 });
+        if (!railway) return new Response(SIGNED_OUT_MESSAGE, { status: 401 });
 
         const body = ChatRequest.safeParse(await request.json().catch(() => null));
         if (!body.success) return new Response("Invalid request", { status: 400 });

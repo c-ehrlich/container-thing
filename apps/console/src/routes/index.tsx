@@ -1,10 +1,9 @@
-import { Button, buttonVariants } from "@repo/ui/primitives/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/primitives/card";
+import { Button } from "@repo/ui/primitives/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@repo/ui/primitives/empty";
 import { Spinner } from "@repo/ui/primitives/spinner";
 import { useQueries } from "@tanstack/react-query";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
-import { CircleCheckIcon, TrainFrontIcon } from "lucide-react";
+import { CircleCheckIcon } from "lucide-react";
 
 import { InsightsPanel } from "../components/overview/insights-panel";
 import { NeedsYouCard } from "../components/overview/needs-you-card";
@@ -39,29 +38,8 @@ const rootRoute = getRouteApi("__root__");
 
 function Home() {
   const { viewer } = rootRoute.useLoaderData();
-
-  if (!viewer) {
-    return (
-      // The name is the heading; the button says "Sign in", so the title doesn't need to.
-      <main className="grid min-h-svh place-items-center p-6">
-        <Card className="w-full max-w-xs gap-6 py-8 [--card-spacing:--spacing(6)]">
-          <CardHeader className="justify-items-center gap-3 text-center">
-            <span className="grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <TrainFrontIcon className="size-5" />
-            </span>
-            <CardTitle>
-              <h1 className="text-lg font-semibold tracking-tight">Container Thing</h1>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <a href="/auth/login" className={buttonVariants({ size: "lg", className: "w-full" })}>
-              Sign in with Railway
-            </a>
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
+  // Signed out, the root shows the sign-in screen instead.
+  if (!viewer) return null;
 
   if (viewer.workspaces.every((w) => w.projects.length === 0)) {
     return (
