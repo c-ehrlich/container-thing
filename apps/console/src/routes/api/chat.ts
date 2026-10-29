@@ -3,15 +3,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
-  stepCountIs,
   streamText,
   toUIMessageStream,
   validateUIMessages,
 } from "ai";
 import { z } from "zod";
 
-import { ChatContext, MAX_STEPS, instructions } from "../../domains/assistant/prompt";
-import { createChatTools } from "../../domains/assistant/tools";
+import { assistantSettings } from "../../domains/assistant/assistant";
+import { ChatContext } from "../../domains/assistant/prompt";
 import type { ChatMessage } from "../../domains/assistant/tools";
 import { env } from "../../server/env";
 import { getRailway } from "../../server/railway/backend";
@@ -31,7 +30,8 @@ export const Route = createFileRoute("/api/chat")({
         const body = ChatRequest.safeParse(await request.json().catch(() => null));
         if (!body.success) return new Response("Invalid request", { status: 400 });
 
-        const tools = createChatTools(railway);
+        const settings = assistantSettings(railway, body.data.context);
+        const { tools } = settings;
         const messages = await validateUIMessages<ChatMessage>({
           messages: body.data.messages,
           tools,
@@ -39,12 +39,9 @@ export const Route = createFileRoute("/api/chat")({
 
         const openrouter = createOpenRouter({ apiKey: env.OPENROUTER_API_KEY });
         const result = streamText({
+          ...settings,
           model: openrouter.chat(env.OPENROUTER_MODEL),
-          instructions: instructions(body.data.context),
           messages: await convertToModelMessages(messages, { tools }),
-          tools,
-          toolApproval: { stopService: "user-approval" },
-          stopWhen: stepCountIs(MAX_STEPS),
         });
 
         return createUIMessageStreamResponse({

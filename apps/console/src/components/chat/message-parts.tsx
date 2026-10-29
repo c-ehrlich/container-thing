@@ -1,5 +1,6 @@
 import { Button } from "@repo/ui/primitives/button";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@repo/ui/primitives/item";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@repo/ui/primitives/item";
+import { Skeleton } from "@repo/ui/primitives/skeleton";
 import { Spinner } from "@repo/ui/primitives/spinner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -10,7 +11,7 @@ import { Streamdown } from "streamdown";
 
 import type { ChatMessage } from "../../domains/assistant/tools";
 import { projectScope } from "../../domains/project/project";
-import { ServiceListWidget, ServiceWidget, WidgetCard, WidgetError } from "./widgets";
+import { ServicesWidget, ServiceWidget, WidgetCard, WidgetError, WidgetHeading } from "./widgets";
 
 type Part = ChatMessage["parts"][number];
 type ToolPart<Name extends string> = Extract<Part, { type: `tool-${Name}` }>;
@@ -29,6 +30,10 @@ export function MessagePart(props: { part: Part; onApproval: ApprovalHandler }) 
       return <ListProjectsPart part={part} />;
     case "tool-listServices":
       return <ListServicesPart part={part} />;
+    case "tool-showProjects":
+      return <ShowProjectsPart part={part} />;
+    case "tool-showServices":
+      return <ShowServicesPart part={part} />;
     case "tool-startService":
       return <StartServicePart part={part} />;
     case "tool-stopService":
@@ -49,30 +54,13 @@ export function MessagePart(props: { part: Part; onApproval: ApprovalHandler }) 
   }
 }
 
+// Lookups are for the model, so they only leave a note; `show*` parts are what the user reads.
+
 function ListProjectsPart(props: { part: ToolPart<"listProjects"> }) {
   const { part } = props;
   switch (part.state) {
     case "output-available":
-      return (
-        <WidgetCard>
-          <ItemGroup className="gap-0">
-            {part.output.flatMap((workspace) =>
-              workspace.projects.map((project) => (
-                <Item
-                  key={project.id}
-                  size="xs"
-                  render={<Link to="/projects/$projectId" params={{ projectId: project.id }} />}
-                >
-                  <ItemContent className="min-w-0">
-                    <ItemTitle>{project.name}</ItemTitle>
-                    <ItemDescription className="truncate">{workspace.name}</ItemDescription>
-                  </ItemContent>
-                </Item>
-              )),
-            )}
-          </ItemGroup>
-        </WidgetCard>
-      );
+      return <ToolCaption>Looked up projects</ToolCaption>;
     case "output-error":
       return <WidgetError>{part.errorText}</WidgetError>;
     case "input-streaming":
@@ -94,12 +82,7 @@ function ListServicesPart(props: { part: ToolPart<"listServices"> }) {
   const { part } = props;
   switch (part.state) {
     case "output-available":
-      return (
-        <ServiceListWidget
-          projectId={part.output.projectId}
-          environmentId={part.output.environmentId}
-        />
-      );
+      return <ToolCaption>{checkedServicesCaption(part.output)}</ToolCaption>;
     case "output-error":
       return <WidgetError>{part.errorText}</WidgetError>;
     case "input-streaming":
@@ -109,6 +92,85 @@ function ListServicesPart(props: { part: ToolPart<"listServices"> }) {
     case "approval-responded":
     case "output-denied":
       // Service lookups do not require approval.
+      return null;
+    default:
+      // type error if there are unhandled cases
+      part satisfies never;
+      return null;
+  }
+}
+
+function checkedServicesCaption(
+  output: Extract<ToolPart<"listServices">, { state: "output-available" }>["output"],
+) {
+  const [only, ...rest] = output;
+  if (only && rest.length === 0 && "projectName" in only) {
+    return `Checked services in ${only.projectName}`;
+  }
+  return `Checked services in ${pluralize(output.length, "project")}`;
+}
+
+const pluralize = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+function ShowProjectsPart(props: { part: ToolPart<"showProjects"> }) {
+  const { part } = props;
+  switch (part.state) {
+    case "output-available":
+      return (
+        <WidgetCard>
+          {[...new Set(part.output.projects.map((p) => p.workspaceName))].map((workspaceName) => (
+            <ItemGroup key={workspaceName} className="gap-0">
+              <WidgetHeading>{workspaceName}</WidgetHeading>
+              {part.output.projects
+                .filter((p) => p.workspaceName === workspaceName)
+                .map((project) => (
+                  <Item
+                    key={project.id}
+                    size="xs"
+                    render={<Link to="/projects/$projectId" params={{ projectId: project.id }} />}
+                  >
+                    <ItemContent className="min-w-0">
+                      <ItemTitle>{project.name}</ItemTitle>
+                    </ItemContent>
+                  </Item>
+                ))}
+            </ItemGroup>
+          ))}
+        </WidgetCard>
+      );
+    case "output-error":
+      return <WidgetError>{part.errorText}</WidgetError>;
+    case "input-streaming":
+    case "input-available":
+      return <Skeleton className="h-14" />;
+    case "approval-requested":
+    case "approval-responded":
+    case "output-denied":
+      // Showing projects does not require approval.
+      return null;
+    default:
+      // type error if there are unhandled cases
+      part satisfies never;
+      return null;
+  }
+}
+
+function ShowServicesPart(props: { part: ToolPart<"showServices"> }) {
+  const { part } = props;
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return <Skeleton className="h-14" />;
+    case "output-error":
+      return <WidgetError>{part.errorText}</WidgetError>;
+    case "output-available":
+      // Nothing to list: the reply says what that means.
+      if (part.output.count === 0) return <ToolCaption>No matching services</ToolCaption>;
+      return <ServicesWidget services={part.output.services} />;
+    case "approval-requested":
+    case "approval-responded":
+    case "output-denied":
+      // Showing services does not require approval.
       return null;
     default:
       // type error if there are unhandled cases
