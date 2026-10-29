@@ -4,13 +4,12 @@ A console for [Railway](https://railway.com) projects, with a chat assistant tha
 
 ## Running it locally
 
-You need Node 24 or newer, a Railway account and an [OpenRouter](https://openrouter.ai) API key.
+You need Node 26 or newer (`.nvmrc` has it, for nvm and fnm), a Railway account and an [OpenRouter](https://openrouter.ai) API key.
 
-**1. Install.** The repo pins pnpm 12 through Corepack. Node 24 bundles an older Corepack that can't run pnpm 12, so upgrade it once per machine:
+**1. Install.** pnpm 10 or newer works: inside the repo it switches to the version pinned in `package.json` by itself. `--allow-scripts` lets npm swap in pnpm's native binary, which starts faster.
 
 ```sh
-npm i -g corepack@latest
-corepack enable
+npm i -g --allow-scripts=pnpm pnpm
 pnpm install
 ```
 
