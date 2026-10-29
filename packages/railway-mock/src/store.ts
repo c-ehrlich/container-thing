@@ -77,6 +77,16 @@ export interface ServiceInstance {
   usage: Usage;
 }
 
+/** A volume mounted into one service in one environment; Railway calls this a volume instance. */
+export interface Volume {
+  id: string;
+  projectId: string;
+  serviceId: string;
+  environmentId: string;
+  name: string;
+  mountPath: string;
+}
+
 export interface Deployment {
   id: string;
   projectId: string;
@@ -102,6 +112,7 @@ export interface World {
   environments: Environment[];
   services: Service[];
   instances: ServiceInstance[];
+  volumes: Volume[];
   /** Oldest first. */
   deployments: Deployment[];
 }
@@ -241,6 +252,10 @@ export class MockStore {
     );
     if (!instance) throw new Error("ServiceInstance not found");
     return instance;
+  }
+
+  volumesIn(environmentId: string) {
+    return this.#world.volumes.filter((v) => v.environmentId === environmentId);
   }
 
   hasDeployment(id: string) {
@@ -383,8 +398,36 @@ export class MockStore {
         ? { cpu: 0.03, memoryGb: 0.25, diskGb: 0.5 }
         : { cpu: 0.05, memoryGb: 0.15, egressGbPerMonth: 1 },
     });
-    this.deploy(service.id, environment.id);
+    // Like Railway, a service without a source waits for one before it deploys.
+    if (service.image || service.repo) this.deploy(service.id, environment.id);
     return service;
+  }
+
+  /** Points the service at another image, which its next deploy runs. */
+  setImage(serviceId: string, image: string) {
+    this.service(serviceId).image = image;
+    for (const instance of this.#world.instances.filter((i) => i.serviceId === serviceId)) {
+      this.#emit({ environmentId: instance.environmentId });
+    }
+  }
+
+  /** Adds a volume to the service. Like Railway, that redeploys it if it has a source to deploy. */
+  createVolume(input: {
+    projectId: string;
+    environmentId: string;
+    serviceId: string;
+    mountPath: string;
+  }) {
+    const volume: Volume = {
+      ...input,
+      id: crypto.randomUUID(),
+      name: `${this.service(input.serviceId).name}-volume`,
+    };
+    this.#world.volumes.push(volume);
+    this.#emit({ environmentId: input.environmentId });
+    const service = this.service(input.serviceId);
+    if (service.image || service.repo) this.deploy(service.id, input.environmentId);
+    return volume;
   }
 
   /** Removes the service from one environment, and the service itself once no environment has it. */
@@ -396,6 +439,9 @@ export class MockStore {
     );
     world.deployments = world.deployments.filter(
       (d) => !(d.serviceId === serviceId && d.environmentId === environmentId),
+    );
+    world.volumes = world.volumes.filter(
+      (v) => !(v.serviceId === serviceId && v.environmentId === environmentId),
     );
     if (!world.instances.some((i) => i.serviceId === serviceId)) {
       world.services = world.services.filter((s) => s.id !== serviceId);

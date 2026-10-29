@@ -25,11 +25,13 @@ export type SuggestedVariable = z.infer<typeof SuggestedVariable>;
 const TemplateSuggestion = z.object({
   templateName: z.string(),
   variables: z.array(SuggestedVariable),
-  /**
-   * Template settings we don't apply, but which the variables may rely on: Railway's Redis template
-   * only enforces `REDIS_PASSWORD` through its start command, for example.
-   */
+  /** Where the template mounts a volume, which the dialog suggests too. */
   volumeMountPath: z.string().nullable(),
+  /**
+   * A setting we don't apply, but which the variables may rely on: Railway's Redis template only
+   * enforces `REDIS_PASSWORD` through its start command, for example.
+   * TODO: handle this
+   */
   startCommand: z.string().nullable(),
 });
 export type TemplateSuggestion = z.infer<typeof TemplateSuggestion>;

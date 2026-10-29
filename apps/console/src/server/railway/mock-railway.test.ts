@@ -149,6 +149,25 @@ describe("the mock Railway", () => {
     expect(await status()).toBe("SUCCESS");
   });
 
+  it("creates a service with a volume, deploying it once", async () => {
+    const viewer = await fetchViewer(railway);
+    const projectId = viewer.workspaces[0]?.projects[0]?.id ?? "";
+    const environmentId = (await fetchProject(railway, projectId)).environments[0]?.id ?? "";
+    const serviceId = await createService(railway, {
+      projectId,
+      environmentId,
+      name: "postgres",
+      image: "postgres:17",
+      variables: { POSTGRES_PASSWORD: "secret" },
+      volumeMountPath: "/var/lib/postgresql/data",
+    });
+
+    const service = await fetchService(railway, { serviceId, environmentId });
+    expect(service.source).toBe("postgres:17");
+    expect(service.volumeMountPath).toBe("/var/lib/postgresql/data");
+    expect(service.deployments).toHaveLength(1);
+  });
+
   it("runs every RailwayAction the buttons and insights offer", async () => {
     const viewer = await fetchViewer(railway);
     const projectId = viewer.workspaces[0]?.projects[0]?.id ?? "";

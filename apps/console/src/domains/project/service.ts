@@ -8,7 +8,10 @@ import { requireRailway } from "../../server/railway/require-railway";
 import { projectScope } from "./project";
 import { deploymentMeta, domainsOf, oneDayAgo, sourceOf } from "./service-fields";
 
-/** One service in one environment: its settings, its deploys and its last day of CPU and memory. */
+/**
+ * One service in one environment: its settings and volume,
+ * its deploys and its last day of CPU and memory.
+ */
 const ServiceQuery = graphql(`
   query Service($serviceId: String!, $environmentId: String!, $since: DateTime!) {
     serviceInstance(serviceId: $serviceId, environmentId: $environmentId) {
@@ -28,6 +31,16 @@ const ServiceQuery = graphql(`
         }
         customDomains {
           domain
+        }
+      }
+    }
+    environment(id: $environmentId) {
+      volumeInstances {
+        edges {
+          node {
+            serviceId
+            mountPath
+          }
         }
       }
     }
@@ -66,7 +79,7 @@ export async function fetchService(
   railway: RailwayClient,
   input: { serviceId: string; environmentId: string },
 ) {
-  const { serviceInstance, deployments, metrics } = await railway(ServiceQuery, {
+  const { serviceInstance, environment, deployments, metrics } = await railway(ServiceQuery, {
     ...input,
     since: oneDayAgo(),
   });
@@ -85,6 +98,9 @@ export async function fetchService(
     cronSchedule: serviceInstance.cronSchedule,
     nextCronRunAt: serviceInstance.nextCronRunAt,
     domains: domainsOf(serviceInstance.domains),
+    volumeMountPath:
+      environment.volumeInstances.edges.find(({ node }) => node.serviceId === input.serviceId)?.node
+        .mountPath ?? null,
     /** Newest first. */
     deployments: deployments.edges.map(({ node: deployment }) => {
       const meta = deploymentMeta(deployment.meta);
