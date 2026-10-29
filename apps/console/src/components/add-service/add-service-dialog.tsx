@@ -71,6 +71,8 @@ const imageRef = (values: { image: string; tag: string }) =>
 interface VariableRow extends SuggestedVariable {
   /** Only for React keys, so removing a row doesn't shuffle the inputs. */
   id: string;
+  /** Suggested by the template, so its name is fixed and only the value is edited. */
+  fromTemplate: boolean;
 }
 
 const VariablesStep = z.object({
@@ -83,6 +85,7 @@ const VariablesStep = z.object({
           value: z.string(),
           description: z.string().nullable(),
           required: z.boolean(),
+          fromTemplate: z.boolean(),
         })
         .superRefine((variable, ctx) => {
           if (!/^[A-Za-z_]\w*$/.test(variable.key)) {
@@ -118,9 +121,10 @@ const variablesFormOptions = formOptions({
   defaultValues: { variables: [] as VariableRow[] },
 });
 
-const toRow = (variable: SuggestedVariable): VariableRow => ({
+const toRow = (variable: SuggestedVariable, fromTemplate: boolean): VariableRow => ({
   ...variable,
   id: crypto.randomUUID(),
+  fromTemplate,
 });
 
 /**
@@ -149,7 +153,7 @@ function AddServiceSteps(props: {
       const found = await queryClient.fetchQuery(templateSuggestionQuery(image)).catch(() => null);
       const repository = parseImageRef(image).repository;
       if (filledFor.current !== repository) {
-        variablesForm.setFieldValue("variables", found?.variables.map(toRow) ?? []);
+        variablesForm.setFieldValue("variables", found?.variables.map((v) => toRow(v, true)) ?? []);
         filledFor.current = repository;
       }
       setSuggestion(found);
@@ -266,9 +270,9 @@ function AddServiceSteps(props: {
               : "We don't know what this image needs, so check its docs and add any variables here."}
           </DialogDescription>
         </DialogHeader>
-        <VariablesFields form={variablesForm} />
+        {/* Before the list: losing data on redeploy matters more than any one variable. */}
         {(suggestion?.volumeMountPath || suggestion?.startCommand) && (
-          <Alert>
+          <Alert className="border-transparent bg-warning/10 *:[svg]:text-warning">
             <TriangleAlertIcon />
             <AlertTitle>The template sets up more than variables</AlertTitle>
             <AlertDescription>
@@ -289,6 +293,7 @@ function AddServiceSteps(props: {
             </AlertDescription>
           </Alert>
         )}
+        <VariablesFields form={variablesForm} />
         {create.error && <FieldError>{create.error.message}</FieldError>}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setStep("image")}>
@@ -309,14 +314,35 @@ const VariablesFields = withForm({
         {(field) => (
           <div className="grid gap-3">
             {field.state.value.length > 0 && (
-              <div className="-mx-4 grid max-h-[50vh] gap-3 overflow-y-auto px-4">
+              // More space between variables than within one, so a description reads as part of
+              // the variable above it, not the one below.
+              <div className="-mx-4 grid max-h-[50vh] gap-5 overflow-y-auto px-4">
                 {field.state.value.map((variable, index) => (
-                  <div key={variable.id} className="grid gap-1">
-                    <div className="flex items-start gap-2">
+                  // Two columns: what the variable is on the left, its value on the right. A
+                  // template's names are fixed, so they read as labels with their description
+                  // underneath; variables added here get a name field instead.
+                  <div
+                    key={variable.id}
+                    className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] items-start gap-2"
+                  >
+                    {variable.fromTemplate ? (
+                      <div className="grid min-w-0 gap-0.5">
+                        <span className="flex h-8 min-w-0 items-center font-mono text-sm">
+                          <span className="truncate" title={variable.key}>
+                            {variable.key}
+                          </span>
+                        </span>
+                        {variable.description && (
+                          <FieldDescription className="-mt-1 text-xs">
+                            {variable.description}
+                          </FieldDescription>
+                        )}
+                      </div>
+                    ) : (
                       <form.AppField name={`variables[${index}].key`}>
                         {(keyField) => (
                           <keyField.TextField
-                            className="w-2/5 shrink-0 font-mono"
+                            className="min-w-0 font-mono"
                             aria-label="Variable name"
                             placeholder="NAME"
                             autoComplete="off"
@@ -324,32 +350,27 @@ const VariablesFields = withForm({
                           />
                         )}
                       </form.AppField>
-                      <form.AppField name={`variables[${index}].value`}>
-                        {(valueField) => (
-                          <valueField.TextField
-                            className="font-mono"
-                            aria-label={`Value of ${variable.key || "variable"}`}
-                            placeholder="value"
-                            autoComplete="off"
-                            spellCheck={false}
-                          />
-                        )}
-                      </form.AppField>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Remove ${variable.key || "variable"}`}
-                        onClick={() => field.removeValue(index)}
-                      >
-                        <XIcon />
-                      </Button>
-                    </div>
-                    {variable.description && (
-                      <FieldDescription className="text-xs">
-                        {variable.description}
-                      </FieldDescription>
                     )}
+                    <form.AppField name={`variables[${index}].value`}>
+                      {(valueField) => (
+                        <valueField.TextField
+                          className="min-w-0 font-mono"
+                          aria-label={`Value of ${variable.key || "variable"}`}
+                          placeholder="value"
+                          autoComplete="off"
+                          spellCheck={false}
+                        />
+                      )}
+                    </form.AppField>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${variable.key || "variable"}`}
+                      onClick={() => field.removeValue(index)}
+                    >
+                      <XIcon />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -366,7 +387,9 @@ const VariablesFields = withForm({
               size="sm"
               className="justify-self-start"
               onClick={() =>
-                field.pushValue(toRow({ key: "", value: "", description: null, required: false }))
+                field.pushValue(
+                  toRow({ key: "", value: "", description: null, required: false }, false),
+                )
               }
             >
               <PlusIcon />
