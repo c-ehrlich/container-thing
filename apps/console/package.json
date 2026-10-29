@@ -9,6 +9,7 @@
     "typecheck": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval": "vitest run --config vitest.eval.config.ts",
     "graphql:generate": "sh scripts/generate-graphql.sh"
   },
   "dependencies": {
