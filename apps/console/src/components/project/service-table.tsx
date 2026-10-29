@@ -13,8 +13,10 @@ import { InsightActionButton } from "../overview/insight-action";
 import { Sparkline, formatCpu, formatMemory } from "../overview/sparkline";
 import { ServiceStatusBadge } from "../service-status-badge";
 
-const COLUMNS =
-  "grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.6fr)_minmax(0,1.5fr)_7rem_1rem] items-center gap-4";
+/** The table's columns. Rows are subgrids of it, so the action column fits its widest button. */
+const TABLE =
+  "grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.6fr)_minmax(0,1.5fr)_auto_1rem] gap-x-4";
+const COLUMNS = "col-span-full grid grid-cols-subgrid items-center";
 
 /**
  * Every service in one environment, broken ones first: status, the last day of CPU, memory now, the
@@ -34,15 +36,17 @@ export function ServiceTable(props: {
   );
 
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <div className="min-w-[56rem]">
+    // Sized to the page, not the window: the sparklines drop out when the assistant narrows it,
+    // so the row's fix stays visible instead of scrolling off to the right.
+    <div className="@container overflow-x-auto rounded-xl bg-card/60">
+      <div className={cn(TABLE, "min-w-[40rem]")}>
         <div
           className={cn(COLUMNS, "border-b px-4 py-2.5 text-xs font-medium text-muted-foreground")}
         >
           <span>Service</span>
           <span>Status</span>
           <span>CPU · 24h</span>
-          <span>Memory</span>
+          <span className="text-right">Memory</span>
           <span>Last deploy</span>
           <span />
           <span />
@@ -80,8 +84,8 @@ function ServiceRow(props: {
     <div
       className={cn(
         COLUMNS,
-        "relative isolate border-b px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted/30",
-        service.state.kind === "failed" && "bg-destructive/5",
+        "group relative isolate border-b px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted/30",
+        service.state.kind === "failed" && "bg-destructive/6",
       )}
     >
       <div className="flex min-w-0 items-center gap-2.5">
@@ -112,16 +116,16 @@ function ServiceRow(props: {
           <>
             {/* A line needs two samples; a service started minutes ago may only have one. */}
             {usage && usage.cpu.length > 1 && (
-              <Sparkline values={usage.cpu} className="text-primary" />
+              <Sparkline values={usage.cpu} className="hidden text-primary @4xl:block" />
             )}
-            <span className="text-xs tabular-nums">{formatCpu(cpu)}</span>
+            <span className="ml-auto text-xs whitespace-nowrap tabular-nums">{formatCpu(cpu)}</span>
           </>
         ) : (
           <span className="text-xs text-muted-foreground/60">—</span>
         )}
       </div>
 
-      <span className="text-xs text-muted-foreground tabular-nums">
+      <span className="text-right text-xs whitespace-nowrap text-muted-foreground tabular-nums">
         {live && memory !== undefined ? formatMemory(memory) : "—"}
       </span>
 
@@ -141,13 +145,21 @@ function ServiceRow(props: {
         )}
       </div>
 
-      {/* Above the row's link, so the button doesn't open the service. */}
-      <div className="relative z-10 justify-self-end">
+      {/* Above the row's link, so the button doesn't open the service. A broken row shows its fix;
+          on healthy rows it's routine (Restart), so it waits for hover or focus. */}
+      <div
+        className={cn(
+          "relative z-10 justify-self-end",
+          service.state.kind !== "failed" &&
+            "opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100",
+        )}
+      >
         {action && (
           <InsightActionButton
             action={action}
             projectId={project.id}
-            variant={service.state.kind === "failed" ? "default" : "outline"}
+            // The insight above the table already holds the page's one primary button.
+            variant="outline"
           />
         )}
       </div>

@@ -55,10 +55,13 @@ export function TopologyDiagram(props: {
   return (
     // Interactive only on the nodes, so a link under the diagram (a project card's) still works
     // everywhere else.
-    <div className="pointer-events-none absolute inset-0">
+    // At most 1.5× the drawn size: scaled further, 12px labels turn into headlines and the diagram
+    // shouts over the page around it.
+    <div className="pointer-events-none absolute inset-0 grid place-items-center">
       <svg
         key={environment.id}
         viewBox={fit(nodes)}
+        style={{ maxWidth: WIDTH * 1.5, maxHeight: HEIGHT * 1.5 }}
         className="size-full animate-in fade-in-0 duration-300"
         aria-hidden
       >
