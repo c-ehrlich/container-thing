@@ -66,7 +66,7 @@ pnpm --filter @repo/console eval   # the chat assistant against a real model (us
 
 ## Deploying
 
-The console runs on [Railway](https://railway.com), built by Railpack from the repo root. The service is described in `.railway/railway.ts` ([docs](https://docs.railway.com/infrastructure-as-code)); Railway doesn't read it during deploys, it's applied with the Railway CLI:
+The console runs on [Railway](https://railway.com), built by Railpack from the repo root. Keep `.nvmrc`: with it, Railpack uses the pinned pnpm from `package.json`; without it, Railpack falls back to its default pnpm 9 (check with `railpack info .`). The service is described in `.railway/railway.ts` ([docs](https://docs.railway.com/infrastructure-as-code)); Railway doesn't read it during deploys, it's applied with the Railway CLI:
 
 ```sh
 railway config plan    # preview changes to the linked environment
