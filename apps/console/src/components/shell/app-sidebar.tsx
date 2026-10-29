@@ -2,9 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@repo/ui/primitives/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@repo/ui/primitives/dropdown-menu";
 import {
@@ -19,10 +17,9 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@repo/ui/primitives/sidebar";
-import { Link, useMatch } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import {
   ArrowUpRightIcon,
-  BoxesIcon,
   ChevronsUpDownIcon,
   FileTextIcon,
   LayoutGridIcon,
@@ -37,7 +34,7 @@ import { BackendMenu } from "./backend-menu";
 /**
  * Collapsing to icons shrinks the menu buttons to 32px squares, so the header and footer have fixed
  * heights and center their button: nothing moves, and the hover area hugs the icon. The header is
- * as tall as the top bar so the project icon lines up with the sidebar toggle there.
+ * as tall as the top bar so its icon lines up with the sidebar toggle there.
  */
 const HEADER_HEIGHT = "h-12 justify-center py-0";
 const FOOTER_HEIGHT = "h-14 justify-center py-0";
@@ -53,38 +50,26 @@ const RESOURCES = [
   { label: "Central Station", href: "https://station.railway.com", icon: TrainFrontIcon },
 ];
 
-/** Left navigation: switch projects, jump between pages, pick the data source, and the signed-in user. */
+/**
+ * Left navigation: the console's screens, Railway's help, the data source, and the signed-in user.
+ * It's the same on every page; which project you're in is the top bar's job.
+ */
 export function AppSidebar({ viewer, backend }: { viewer: Viewer; backend: Backend }) {
-  const match = useMatch({ from: "/projects/$projectId", shouldThrow: false });
-  const home = useMatch({ from: "/", shouldThrow: false });
-  const projectId = match?.params.projectId;
-
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className={HEADER_HEIGHT}>
-        <ProjectSwitcher viewer={viewer} projectId={projectId} />
+        <Brand />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton isActive={!!home} tooltip="Projects" render={<Link to="/" />}>
+              {/* The only screen so far: every project and service page sits under it. */}
+              <SidebarMenuButton isActive tooltip="Projects" render={<Link to="/" />}>
                 <LayoutGridIcon />
                 <span>Projects</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            {projectId && (
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive
-                  tooltip="Services"
-                  render={<Link to="/projects/$projectId" params={{ projectId }} />}
-                >
-                  <BoxesIcon />
-                  <span>Services</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
           </SidebarMenu>
         </SidebarGroup>
         <SidebarSeparator />
@@ -124,46 +109,16 @@ export function AppSidebar({ viewer, backend }: { viewer: Viewer; backend: Backe
   );
 }
 
-function ProjectSwitcher({ viewer, projectId }: { viewer: Viewer; projectId?: string }) {
-  const projects = viewer.workspaces.flatMap((workspace) =>
-    workspace.projects.map((project) => ({ ...project, workspace: workspace.name })),
-  );
-  const current = projects.find((project) => project.id === projectId);
-
+function Brand() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className={ICON_BUTTON} />}>
-            <Monogram name={current?.name ?? "?"} />
-            <div className="grid flex-1 text-left leading-tight">
-              <span className="truncate font-medium">{current?.name ?? "Select a project"}</span>
-              {current && (
-                <span className="truncate text-xs text-muted-foreground">{current.workspace}</span>
-              )}
-            </div>
-            <ChevronsUpDownIcon className="ml-auto" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="min-w-56">
-            {viewer.workspaces.map((workspace) => (
-              <DropdownMenuGroup key={workspace.id}>
-                <DropdownMenuLabel>{workspace.name}</DropdownMenuLabel>
-                {workspace.projects.map((project) => (
-                  <DropdownMenuItem
-                    key={project.id}
-                    render={<Link to="/projects/$projectId" params={{ projectId: project.id }} />}
-                  >
-                    <Monogram name={project.name} size="sm" />
-                    {project.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-            ))}
-            {projects.length === 0 && (
-              <DropdownMenuLabel>Log in again and pick projects to share.</DropdownMenuLabel>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <SidebarMenuButton size="lg" className={ICON_BUTTON} render={<Link to="/" />}>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <TrainFrontIcon className="size-4" />
+          </span>
+          <span className="truncate font-medium">Container Thing</span>
+        </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
   );
@@ -204,19 +159,5 @@ function UserMenu({ user }: { user: Viewer["user"] }) {
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  );
-}
-
-function Monogram({ name, size = "default" }: { name: string; size?: "default" | "sm" }) {
-  return (
-    <span
-      className={
-        size === "sm"
-          ? "flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[0.625rem] font-medium"
-          : "flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary font-medium text-primary-foreground"
-      }
-    >
-      {name.slice(0, 1).toUpperCase()}
-    </span>
   );
 }

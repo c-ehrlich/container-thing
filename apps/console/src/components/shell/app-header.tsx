@@ -16,6 +16,7 @@ import { PanelLeftCloseIcon, PanelLeftOpenIcon, SparklesIcon } from "lucide-reac
 import { projectQuery } from "../../domains/project/project";
 import type { Viewer } from "../../domains/project/viewer";
 import type { Backend } from "../../server/railway/backend";
+import { ProjectSwitcher } from "./project-switcher";
 import { ShortcutTooltip } from "./shortcut-tooltip";
 
 /**
@@ -29,6 +30,31 @@ export function AppHeader(props: {
   onOpenChat: () => void;
 }) {
   const { viewer, backend, chatOpen, onOpenChat } = props;
+
+  return (
+    <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
+      <SidebarToggle />
+      <Crumbs viewer={viewer} />
+      <div className="ml-auto flex items-center gap-2">
+        {backend === "mock" && <Badge variant="outline">Mock data</Badge>}
+        {!chatOpen && (
+          <ShortcutTooltip label="Open assistant" shortcut="⌘I">
+            <Button variant="outline" size="sm" onClick={onOpenChat}>
+              <SparklesIcon />
+              Assistant
+            </Button>
+          </ShortcutTooltip>
+        )}
+      </div>
+    </header>
+  );
+}
+
+/**
+ * Where you are: Projects › project › service. Every crumb but the last links to its page, and the
+ * project's also switches to another project.
+ */
+function Crumbs({ viewer }: { viewer: Viewer }) {
   const match = useMatch({ from: "/projects/$projectId", shouldThrow: false });
   const serviceMatch = useMatch({
     from: "/projects/$projectId/services/$serviceId",
@@ -47,61 +73,48 @@ export function AppHeader(props: {
     .find((s) => s.id === serviceMatch?.params.serviceId);
 
   return (
-    <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
-      <SidebarToggle />
-      <Breadcrumb>
-        <BreadcrumbList>
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem>
           {project ? (
-            <>
-              <BreadcrumbItem>
-                <BreadcrumbLink render={<Link to="/" />}>Projects</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                {serviceMatch ? (
-                  <BreadcrumbLink
-                    render={
-                      <Link
-                        to="/projects/$projectId"
-                        params={{ projectId: project.id }}
-                        search={{ environmentId: serviceMatch.search.environmentId }}
-                      />
-                    }
-                  >
-                    {project.name}
-                  </BreadcrumbLink>
-                ) : (
-                  <BreadcrumbPage>{project.name}</BreadcrumbPage>
-                )}
-              </BreadcrumbItem>
-              {serviceMatch && (
-                <>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>{service?.name ?? "Service"}</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </>
-              )}
-            </>
+            <BreadcrumbLink render={<Link to="/" />}>Projects</BreadcrumbLink>
           ) : (
-            <BreadcrumbItem>
-              <BreadcrumbPage>Projects</BreadcrumbPage>
-            </BreadcrumbItem>
+            <BreadcrumbPage>Projects</BreadcrumbPage>
           )}
-        </BreadcrumbList>
-      </Breadcrumb>
-      <div className="ml-auto flex items-center gap-2">
-        {backend === "mock" && <Badge variant="outline">Mock data</Badge>}
-        {!chatOpen && (
-          <ShortcutTooltip label="Open assistant" shortcut="⌘I">
-            <Button variant="outline" size="sm" onClick={onOpenChat}>
-              <SparklesIcon />
-              Assistant
-            </Button>
-          </ShortcutTooltip>
+        </BreadcrumbItem>
+        {project && (
+          <>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="gap-0.5">
+              {serviceMatch ? (
+                <BreadcrumbLink
+                  render={
+                    <Link
+                      to="/projects/$projectId"
+                      params={{ projectId: project.id }}
+                      search={{ environmentId: serviceMatch.search.environmentId }}
+                    />
+                  }
+                >
+                  {project.name}
+                </BreadcrumbLink>
+              ) : (
+                <BreadcrumbPage>{project.name}</BreadcrumbPage>
+              )}
+              <ProjectSwitcher viewer={viewer} projectId={project.id} />
+            </BreadcrumbItem>
+          </>
         )}
-      </div>
-    </header>
+        {serviceMatch && (
+          <>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{service?.name ?? "Service"}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </>
+        )}
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 }
 
