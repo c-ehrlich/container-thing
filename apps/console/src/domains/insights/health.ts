@@ -56,8 +56,8 @@ export function healthOf(project: Project, environment?: Environment): Health {
 export function verdictOf(health: Health): { kind: Kind; label: string } {
   const worst = health.attention[0];
   if (health.kind === "failed" && worst) {
-    const ago = worst.deployment ? ` ${timeAgo(worst.deployment.createdAt)} ago` : "";
-    return { kind: "failed", label: `${worst.name} ${worst.state.label.toLowerCase()}${ago}` };
+    const when = worst.deployment ? ` ${ago(worst.deployment.createdAt)}` : "";
+    return { kind: "failed", label: `${worst.name} ${worst.state.label.toLowerCase()}${when}` };
   }
   if (health.kind === "pending" && worst) {
     return { kind: "pending", label: `${worst.state.label} ${worst.name}` };
@@ -74,6 +74,12 @@ export function timeAgo(iso: string, now = Date.now()) {
   if (minutes < 60) return `${Math.round(minutes)}m`;
   if (minutes < 60 * 24) return `${Math.round(minutes / 60)}h`;
   return `${Math.round(minutes / 60 / 24)}d`;
+}
+
+/** "just now", "7m ago", "3h ago": `timeAgo` for a sentence. */
+export function ago(iso: string, now = Date.now()) {
+  const time = timeAgo(iso, now);
+  return time === "now" ? "just now" : `${time} ago`;
 }
 
 /** "a", "a and b", "a, b and c". */

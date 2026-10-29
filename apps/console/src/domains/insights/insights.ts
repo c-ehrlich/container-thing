@@ -2,7 +2,7 @@ import type { RailwayAction } from "../actions";
 import { primaryEnvironment } from "../project/environments";
 import type { ProjectDeployment, Project } from "../project/project";
 import type { ProjectUsage } from "../project/usage";
-import { listOf, servicesOf, timeAgo } from "./health";
+import { ago, listOf, servicesOf, timeAgo } from "./health";
 import type { ServiceWithState } from "./health";
 
 /**
@@ -146,7 +146,7 @@ function failureInsight(project: Project, service: ServiceWithState, now: number
   };
   const rollback: InsightAction | undefined = lastGood && {
     kind: "rollback",
-    label: `Roll back to ${timeAgo(lastGood.createdAt, now)} ago`,
+    label: `Roll back to ${ago(lastGood.createdAt, now)}`,
     deploymentId: lastGood.id,
   };
   const base = {
@@ -172,7 +172,7 @@ function failureInsight(project: Project, service: ServiceWithState, now: number
       rule: "repeated-failure",
       headline: `${service.name} failed ${failures.length} deploys in a row on ${change}`,
       evidence: lastGood
-        ? `Last good deploy: ${lastGood.commitMessage ? `“${lastGood.commitMessage}”` : "the one before"}${lastGood.creator ? ` by ${lastGood.creator}` : ""}, ${timeAgo(lastGood.createdAt, now)} ago.`
+        ? `Last good deploy: ${lastGood.commitMessage ? `“${lastGood.commitMessage}”` : "the one before"}${lastGood.creator ? ` by ${lastGood.creator}` : ""}, ${ago(lastGood.createdAt, now)}.`
         : "There's no earlier deploy to go back to.",
       primary: rollback ?? logs,
       secondary: rollback ? logs : undefined,
@@ -189,7 +189,7 @@ function failureInsight(project: Project, service: ServiceWithState, now: number
       ...base,
       rule: "crashed",
       headline: `${service.name} crashed`,
-      evidence: `It had been running since a deploy ${timeAgo(deployedAt, now)} ago, so this isn't a new change.`,
+      evidence: `It had been running since a deploy ${ago(deployedAt, now)}, so this isn't a new change.`,
       primary: { kind: "restart", label: "Restart", deploymentId: service.deployment.id },
     };
   }
@@ -214,7 +214,7 @@ function failureInsight(project: Project, service: ServiceWithState, now: number
       evidence:
         elsewhere && elsewhereName
           ? `The same change runs fine on ${elsewhereName}, so check how their variables differ.`
-          : `Deployed${latest?.creator ? ` by ${latest.creator}` : ""} ${timeAgo(deployedAt, now)} ago.`,
+          : `Deployed${latest?.creator ? ` by ${latest.creator}` : ""} ${ago(deployedAt, now)}.`,
       primary:
         rollback ??
         (service.deployment
@@ -227,7 +227,7 @@ function failureInsight(project: Project, service: ServiceWithState, now: number
     ...base,
     rule: "failed-deploy",
     headline: `${service.name} failed to deploy ${change}`,
-    evidence: `Deployed${latest?.creator ? ` by ${latest.creator}` : ""} ${timeAgo(deployedAt, now)} ago. The logs say why.`,
+    evidence: `Deployed${latest?.creator ? ` by ${latest.creator}` : ""} ${ago(deployedAt, now)}. The logs say why.`,
     primary: logs,
     secondary: {
       kind: "deploy",

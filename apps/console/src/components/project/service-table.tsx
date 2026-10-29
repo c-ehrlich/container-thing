@@ -2,7 +2,7 @@ import { cn } from "@repo/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon, DatabaseIcon } from "lucide-react";
 
-import { KIND_ORDER, isDatastore, servicesOf, timeAgo } from "../../domains/insights/health";
+import { KIND_ORDER, ago, isDatastore, servicesOf } from "../../domains/insights/health";
 import type { ServiceWithState } from "../../domains/insights/health";
 import type { Insight } from "../../domains/insights/insights";
 import { primaryActionFor } from "../../domains/insights/primary-action";
@@ -137,7 +137,7 @@ function ServiceRow(props: {
             </span>
             <span className="truncate text-muted-foreground">
               {deployment.creator ? `${deployment.creator} · ` : ""}
-              {timeAgo(deployment.createdAt)} ago
+              {ago(deployment.createdAt)}
             </span>
           </>
         ) : (
