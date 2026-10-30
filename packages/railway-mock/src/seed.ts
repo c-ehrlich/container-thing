@@ -514,7 +514,35 @@ export function seedWorld(options: { now?: number; seed?: number } = {}): World 
     ["chess-engine", "queue"],
   ]);
 
+  addVolumes(world, random);
   return world;
+}
+
+/** Where each kind of datastore keeps its data, as Railway's templates mount it. */
+const DATA_DIRECTORIES: [image: RegExp, mountPath: string][] = [
+  [/postgres/, "/var/lib/postgresql/data"],
+  [/redis/, "/data"],
+  [/clickhouse/, "/var/lib/clickhouse"],
+];
+
+/**
+ * Gives every datastore a volume for its data in each of its environments, as it has on Railway.
+ * Added last, so the IDs drawn for everything else stay the same.
+ */
+function addVolumes(world: World, random: Random) {
+  for (const instance of world.instances) {
+    const service = world.services.find((s) => s.id === instance.serviceId);
+    const mountPath = DATA_DIRECTORIES.find(([image]) => image.test(service?.image ?? ""))?.[1];
+    if (!service || !mountPath) continue;
+    world.volumes.push({
+      id: random.uuid(),
+      projectId: service.projectId,
+      serviceId: service.id,
+      environmentId: instance.environmentId,
+      name: `${service.name}-volume`,
+      mountPath,
+    });
+  }
 }
 
 function addStacks(

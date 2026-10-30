@@ -56,6 +56,7 @@ export function project(history: Record<string, [Status, number, string?][]>): P
                 }
               : null,
             hasEverDeployed: latest !== undefined,
+            volumeMountPath: null,
           };
         }),
       },

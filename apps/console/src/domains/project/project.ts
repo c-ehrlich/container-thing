@@ -10,9 +10,9 @@ import { referencedServices } from "./references";
 import { deploymentMeta, domainsOf, sourceOf } from "./service-fields";
 
 /**
- * Everything the console shows about one project, in one request: each environment's services and
- * their latest deployment, the links between services, and the recent deploy history the insights are
- * built from.
+ * Everything the console shows about one project, in one request: each environment's services, their
+ * latest deployment and volume, the links between services, and the recent deploy history the
+ * insights are built from.
  */
 const ProjectQuery = graphql(`
   query Project($id: String!) {
@@ -65,6 +65,14 @@ const ProjectQuery = graphql(`
                 }
               }
             }
+            volumeInstances {
+              edges {
+                node {
+                  serviceId
+                  mountPath
+                }
+              }
+            }
           }
         }
       }
@@ -110,6 +118,11 @@ export async function fetchProject(railway: RailwayClient, projectId: string) {
           creator: latest.creator?.name ?? null,
         },
         hasEverDeployed: instance.hasEverDeployed,
+        /** Where its volume is mounted, if it has one. */
+        volumeMountPath:
+          environment.volumeInstances.edges.find(
+            ({ node }) => node.serviceId === instance.serviceId,
+          )?.node.mountPath ?? null,
       };
     });
 
