@@ -1676,6 +1676,13 @@ export const projectQuery = (projectId: string) =>
     <mark>queryKey: [...projectScope(projectId), "project"],</mark>
     queryFn: () => getProjectFn({ data: { projectId } }),
     staleTime: 30_000,
+    // Polls every 10 s while a deploy is in flight, so a starting service keeps moving.
+    refetchInterval: (query) =>
+      query.state.data?.environments.some((e) =>
+        e.services.some((s) => deploymentState(s.deployment).kind === "pending"),
+      )
+        ? 10_000
+        : false,
   });</pre>
         </div>
         <div>
@@ -2010,6 +2017,7 @@ onStatus: ({ mode }) => {
   lastPushAt = Date.now();                             // feeds the 30 s watchdog
   setCanvasAvailable(true);
   // Railway re-sends the same hash periodically; only a new one means something changed.
+  // The first one also counts, to cover changes between loading the data and subscribing.
   <mark>if (parsed.data.canvasInvalidation.id === lastHash) return;</mark>
   lastHash = parsed.data.canvasInvalidation.id;
   <mark>changed();</mark>                                          // debounced 250 ms → onChange
@@ -2530,6 +2538,13 @@ export const projectQuery = (projectId: string) =>
     queryKey: [...projectScope(projectId), "project"],
     queryFn: () => getProjectFn({ data: { projectId } }),
     staleTime: 30_000,
+    // Polls every 10 s while a deploy is in flight, so a starting service keeps moving.
+    refetchInterval: (query) =>
+      query.state.data?.environments.some((e) =>
+        e.services.some((s) => deploymentState(s.deployment).kind === "pending"),
+      )
+        ? 10_000
+        : false,
   });`,
         },
         {

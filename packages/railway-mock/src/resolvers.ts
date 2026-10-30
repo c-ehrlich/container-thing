@@ -1,5 +1,5 @@
 import { buildLogs, deployLogs, deployLogsBetween } from "./logs";
-import type { Deployment, MockStore, Project, Service, ServiceInstance } from "./store";
+import type { Deployment, MockStore, Project, Service, ServiceInstance, Volume } from "./store";
 import { stream } from "./stream";
 import { estimate, series } from "./usage";
 import type { Measurement } from "./usage";
@@ -55,6 +55,14 @@ const serviceView = (service: Service) => ({
   projectId: service.projectId,
 });
 
+const volumeInstanceView = (volume: Volume) => ({
+  id: volume.id,
+  volumeId: volume.id,
+  serviceId: volume.serviceId,
+  environmentId: volume.environmentId,
+  mountPath: volume.mountPath,
+});
+
 export function createRoots(store: MockStore) {
   const instanceView = (instance: ServiceInstance) => {
     const service = store.service(instance.serviceId);
@@ -90,6 +98,7 @@ export function createRoots(store: MockStore) {
       projectId: environment.projectId,
       isEphemeral: environment.isEphemeral,
       serviceInstances: () => connection(store.instancesIn(environment.id).map(instanceView)),
+      volumeInstances: () => connection(store.volumesIn(environment.id).map(volumeInstanceView)),
       variables: () =>
         connection(
           store.instancesIn(environment.id).flatMap((instance) =>
@@ -132,6 +141,7 @@ export function createRoots(store: MockStore) {
         projects: store.projectsIn(workspace.id).map(projectView),
       })),
     project: ({ id }: { id: string }) => projectView(store.project(id)),
+    environment: ({ id }: { id: string }) => environmentView(id),
     serviceInstance: (args: { serviceId: string; environmentId: string }) =>
       instanceView(store.instance(args.serviceId, args.environmentId)),
     deployments: (args: {
@@ -211,6 +221,14 @@ export function createRoots(store: MockStore) {
   const mutation = {
     serviceInstanceDeployV2: (args: { serviceId: string; environmentId: string }) =>
       store.deploy(args.serviceId, args.environmentId),
+    // Only the source; the mock doesn't run anything that the other settings would change.
+    serviceInstanceUpdate: (args: {
+      serviceId: string;
+      input: { source?: { image?: string } };
+    }) => {
+      if (args.input.source?.image) store.setImage(args.serviceId, args.input.source.image);
+      return true;
+    },
     deploymentRemove: ({ id }: { id: string }) => {
       store.remove(id);
       return true;
@@ -255,6 +273,14 @@ export function createRoots(store: MockStore) {
           repo: input.source?.repo,
         }),
       ),
+    volumeCreate: ({
+      input,
+    }: {
+      input: { projectId: string; environmentId: string; serviceId: string; mountPath: string };
+    }) => {
+      const volume = store.createVolume(input);
+      return { id: volume.id, name: volume.name, projectId: volume.projectId };
+    },
   };
 
   /** Each yields `{ [field]: value }`, which graphql-js then resolves the selection against. */

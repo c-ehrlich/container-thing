@@ -55,6 +55,24 @@ const CreateServiceMutation = graphql(`
   }
 `);
 
+const SetImageMutation = graphql(`
+  mutation SetImage($serviceId: String!, $environmentId: String!, $image: String!) {
+    serviceInstanceUpdate(
+      serviceId: $serviceId
+      environmentId: $environmentId
+      input: { source: { image: $image } }
+    )
+  }
+`);
+
+const CreateVolumeMutation = graphql(`
+  mutation CreateVolume($input: VolumeCreateInput!) {
+    volumeCreate(input: $input) {
+      id
+    }
+  }
+`);
+
 const DEPLOYMENT_MUTATIONS = {
   /** Restarts the container as it is, without building again. */
   restart: RestartMutation,
@@ -183,23 +201,34 @@ const NewService = z.object({
   name: z.string().min(1),
   image: z.string().min(1),
   variables: z.record(z.string(), z.string()),
+  /** Where to mount a volume, so files saved there survive redeploys. None if unset. */
+  volumeMountPath: z.string().startsWith("/").optional(),
 });
 
 /**
- * Creates a service from a Docker image and returns its ID. Railway deploys it right away;
- * `${{ secret() }}` and reference variables are resolved then, as in templates.
+ * Creates a service from a Docker image, with a volume if asked, deploys it and returns its ID.
+ * `${{ secret() }}` and reference variables are resolved on deploy, as in templates.
+ *
+ * A service with a volume should deploy once, already with the volume. So the service starts
+ * without a source, which doesn't deploy, and setting its image doesn't either. Adding a volume to a
+ * service that has an image deploys it; without a volume, we deploy it ourselves.
  */
 export async function createService(railway: RailwayClient, input: z.infer<typeof NewService>) {
+  const { projectId, environmentId } = input;
   const { serviceCreate } = await railway(CreateServiceMutation, {
-    input: {
-      projectId: input.projectId,
-      environmentId: input.environmentId,
-      name: input.name,
-      source: { image: input.image },
-      variables: input.variables,
-    },
+    input: { projectId, environmentId, name: input.name, variables: input.variables },
   });
-  return serviceCreate.id;
+  const serviceId = serviceCreate.id;
+
+  await railway(SetImageMutation, { serviceId, environmentId, image: input.image });
+  if (input.volumeMountPath) {
+    await railway(CreateVolumeMutation, {
+      input: { projectId, environmentId, serviceId, mountPath: input.volumeMountPath },
+    });
+  } else {
+    await deployService(railway, { serviceId, environmentId });
+  }
+  return serviceId;
 }
 
 export const createServiceFn = createServerFn({ method: "POST" })

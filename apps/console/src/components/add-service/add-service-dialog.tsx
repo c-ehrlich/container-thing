@@ -30,7 +30,11 @@ import { templateSuggestionQuery } from "../../domains/add-service/templates";
 import type { SuggestedVariable, TemplateSuggestion } from "../../domains/add-service/templates";
 import { ImageField, TagField } from "./image-field";
 
-/** Adds a service to the environment from a Docker image, in two steps: the image, then its variables. */
+/**
+ * Adds a service to the environment from a Docker image, in two steps:
+ * 1. the image
+ * 2. its variables and volume.
+ */
 export function AddServiceDialog(props: { projectId: string; environmentId: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -115,10 +119,14 @@ const VariablesStep = z.object({
         seen.add(variable.key);
       }
     }),
+  volumeMountPath: z
+    .string()
+    .trim()
+    .refine((path) => !path || path.startsWith("/"), "Use a full path, like /data."),
 });
 
 const variablesFormOptions = formOptions({
-  defaultValues: { variables: [] as VariableRow[] },
+  defaultValues: { variables: [] as VariableRow[], volumeMountPath: "" },
 });
 
 const toRow = (variable: SuggestedVariable, fromTemplate: boolean): VariableRow => ({
@@ -154,6 +162,7 @@ function AddServiceSteps(props: {
       const repository = parseImageRef(image).repository;
       if (filledFor.current !== repository) {
         variablesForm.setFieldValue("variables", found?.variables.map((v) => toRow(v, true)) ?? []);
+        variablesForm.setFieldValue("volumeMountPath", found?.volumeMountPath ?? "");
         filledFor.current = repository;
       }
       setSuggestion(found);
@@ -185,6 +194,7 @@ function AddServiceSteps(props: {
             image: imageRef(imageForm.state.values),
             name: name.trim() || imageBaseName(image),
             variables: Object.fromEntries(value.variables.map((v) => [v.key, v.value])),
+            volumeMountPath: value.volumeMountPath.trim() || undefined,
           },
         })
         // Settles once the project is refetched, so the new service is on the canvas when it closes.
@@ -263,37 +273,38 @@ function AddServiceSteps(props: {
         }}
       >
         <DialogHeader>
-          <DialogTitle>Variables for {ref}</DialogTitle>
+          <DialogTitle>Set up {ref}</DialogTitle>
           <DialogDescription>
             {suggestion
               ? `Suggested by Railway's ${suggestion.templateName} template. Change anything you like.`
               : "We don't know what this image needs, so check its docs and add any variables here."}
           </DialogDescription>
         </DialogHeader>
-        {/* Before the list: losing data on redeploy matters more than any one variable. */}
-        {(suggestion?.volumeMountPath || suggestion?.startCommand) && (
+        {suggestion?.startCommand && (
           <Alert className="border-transparent bg-warning/10 *:[svg]:text-warning">
             <TriangleAlertIcon />
-            <AlertTitle>The template sets up more than variables</AlertTitle>
+            <AlertTitle>The template runs a custom start command</AlertTitle>
             <AlertDescription>
-              <ul className="list-disc pl-4">
-                {suggestion.volumeMountPath && (
-                  <li>
-                    It mounts a volume at <code>{suggestion.volumeMountPath}</code>. This app can't
-                    add volumes yet, so data there is lost when the service redeploys.
-                  </li>
-                )}
-                {suggestion.startCommand && (
-                  <li>
-                    It runs a custom start command, which this app doesn't copy, so some of these
-                    variables may have no effect.
-                  </li>
-                )}
-              </ul>
+              This app doesn't copy it, so some of these variables may have no effect.
             </AlertDescription>
           </Alert>
         )}
         <VariablesFields form={variablesForm} />
+        <variablesForm.AppField name="volumeMountPath">
+          {(field) => (
+            <field.TextField
+              label="Volume"
+              placeholder="/data"
+              description={
+                suggestion?.volumeMountPath
+                  ? "The template keeps its data here. Files anywhere else are lost when the service redeploys."
+                  : "Files saved under this path survive redeploys. Leave it empty for no volume."
+              }
+              autoComplete="off"
+              spellCheck={false}
+            />
+          )}
+        </variablesForm.AppField>
         {create.error && <FieldError>{create.error.message}</FieldError>}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setStep("image")}>

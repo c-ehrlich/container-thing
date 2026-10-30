@@ -95,6 +95,7 @@ function createBuilder(random: Random, now: number) {
     environments: [],
     services: [],
     instances: [],
+    volumes: [],
     deployments: [],
   };
 

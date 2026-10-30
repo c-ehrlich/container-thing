@@ -2,7 +2,7 @@ import { cn } from "@repo/ui/lib/utils";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@repo/ui/primitives/empty";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router";
-import { GlobeIcon } from "lucide-react";
+import { GlobeIcon, HardDriveIcon } from "lucide-react";
 import { useState } from "react";
 
 import { InsightItem } from "../../../../components/overview/insights-panel";
@@ -248,6 +248,12 @@ function ServiceBody(props: {
                   })}
                 </span>
               )}
+            </p>
+          )}
+          {detail.volumeMountPath && (
+            <p className="flex min-w-0 items-center gap-1.5">
+              <HardDriveIcon className="size-3.5 shrink-0 text-muted-foreground" />
+              Volume at <span className="truncate font-mono text-xs">{detail.volumeMountPath}</span>
             </p>
           )}
           {detail.domains.length === 0 ? (

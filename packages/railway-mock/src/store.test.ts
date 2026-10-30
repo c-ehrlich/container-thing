@@ -69,6 +69,36 @@ describe("MockStore", () => {
     expect(store.latestDeployment(target.serviceId, target.environmentId)?.status).toBe("SUCCESS");
   });
 
+  it("deploys a new service once it has a source and a volume", () => {
+    const store = new MockStore(seedWorld());
+    const { environmentId } = find(store, "billing", "api");
+    const { projectId } = store.environment(environmentId);
+
+    const service = store.createService({ projectId, environmentId, name: "postgres" });
+    expect(store.deployments({ serviceId: service.id })).toHaveLength(0);
+
+    store.setImage(service.id, "postgres:17");
+    expect(store.deployments({ serviceId: service.id })).toHaveLength(0);
+
+    store.createVolume({ projectId, environmentId, serviceId: service.id, mountPath: "/data" });
+    vi.advanceTimersByTime(deploy);
+    expect(store.deployments({ serviceId: service.id })).toHaveLength(1);
+    expect(store.latestDeployment(service.id, environmentId)?.status).toBe("SUCCESS");
+    expect(store.volumesIn(environmentId)).toContainEqual(
+      expect.objectContaining({ serviceId: service.id, mountPath: "/data" }),
+    );
+  });
+
+  it("redeploys a service that gets a volume, like Railway", () => {
+    const store = new MockStore(seedWorld());
+    const target = find(store, "billing", "api");
+    const { projectId } = store.environment(target.environmentId);
+    const before = store.deployments(target).length;
+
+    store.createVolume({ projectId, ...target, mountPath: "/data" });
+    expect(store.deployments(target)).toHaveLength(before + 1);
+  });
+
   it("ignores a deploy's remaining steps once the world is replaced", () => {
     const store = new MockStore(seedWorld());
     const target = find(store, "billing", "api");
