@@ -1670,6 +1670,10 @@ export async function fetchViewer(railway: RailwayClient) {
           "project:member",
           "Let the user <b>pick which projects</b> Console may manage, with member-level access, on the consent screen.",
         ],
+        [
+          "workspace:admin",
+          "Admin access to the workspaces the user picks. Members can't delete services, so <b>Remove</b> needs this.",
+        ],
       ];
       $("#scopes").innerHTML = SCOPES.map(
         ([s, d]) =>
@@ -1735,7 +1739,14 @@ export async function fetchViewer(railway: RailwayClient) {
           title: "The OAuth dance",
           what: "Three functions: <code>startLogin()</code> (make state + PKCE verifier, set temp cookies, build the Railway URL), <code>finishLogin()</code> (verify state, swap code for tokens, save the session), and <code>getFreshSession()</code> (read the session, refresh if under a minute left).",
           why: "Uses <b>arctic</b>'s generic <code>OAuth2Client</code>. arctic is a small library that handles the URL building and token requests, and sends the client secret as HTTP Basic auth.",
-          code: `const SCOPES = ["openid", "email", "profile", "offline_access", "project:member"];
+          code: `const SCOPES = [
+  "openid",
+  "email",
+  "profile",
+  "offline_access",
+  "project:member",
+  "workspace:admin",
+];
 
 const railwayOAuth = () =>
   new OAuth2Client(
@@ -1900,7 +1911,7 @@ APP_URL: z.url().default("http://localhost:3000"),`,
             ch: "front",
             title: "Browser arrives at Railway",
             text: "Everything in this URL is public: the client ID, which scopes, where to send the user back, the state, and the <em>challenge</em> (not the verifier).",
-            env: `<span class="h">GET /oauth/auth</span>\n  ?response_type=code\n  &client_id=<span class="h">…</span>\n  &redirect_uri=http://localhost:3000/auth/callback\n  &scope=openid email profile offline_access project:member\n  &state=Xq3…\n  &code_challenge=E9Mel…&code_challenge_method=S256\n  &prompt=consent`,
+            env: `<span class="h">GET /oauth/auth</span>\n  ?response_type=code\n  &client_id=<span class="h">…</span>\n  &redirect_uri=http://localhost:3000/auth/callback\n  &scope=openid email profile offline_access project:member workspace:admin\n  &state=Xq3…\n  &code_challenge=E9Mel…&code_challenge_method=S256\n  &prompt=consent`,
           },
           {
             from: "R",
