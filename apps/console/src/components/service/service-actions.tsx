@@ -1,3 +1,5 @@
+import { toast } from "@repo/ui/primitives/toast";
+import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon, RotateCcwIcon, RotateCwIcon, SquareIcon, XIcon } from "lucide-react";
 
 import { deploymentState } from "../../domains/project/deployment-state";
@@ -15,10 +17,12 @@ type Target = {
 
 /**
  * What can be done to a service right now, in the order people reach for them: restart what's
- * there, deploy again, stop it. Only the ones that make sense for its current state show.
+ * there, deploy again, stop it. Only the ones that make sense for its current state show. Removing
+ * it goes back to the project, since this page has nothing left to show.
  */
 export function ServiceActions(props: Target) {
   const { projectId, serviceId, environmentId, deployment } = props;
+  const navigate = useNavigate();
   const kind = deploymentState(deployment).kind;
   // A container exists to restart or stop: running, asleep, or crashed (failed builds have none).
   const hasContainer =
@@ -84,6 +88,14 @@ export function ServiceActions(props: Target) {
           serviceName: props.serviceName,
           environmentId,
           environmentName: props.environmentName,
+        }}
+        onSuccess={() => {
+          toast.add({
+            type: "success",
+            title: `Removed ${props.serviceName}`,
+            description: `It's no longer in ${props.environmentName}.`,
+          });
+          void navigate({ to: "/projects/$projectId", params: { projectId } });
         }}
       />
     </div>

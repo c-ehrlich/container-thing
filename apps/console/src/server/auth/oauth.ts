@@ -10,8 +10,17 @@ import { cookieDefaults, readSession, writeSession } from "./session";
 /**
  * `offline_access` returns a refresh token.
  * `project:member` lets the user pick which projects this app may manage on the consent screen.
+ * `workspace:admin` is for deleting services, which project members (Railway's "Editor") can't do.
+ * It stays in addition to `project:member`, because listing the shared projects needs a project scope.
  */
-const SCOPES = ["openid", "email", "profile", "offline_access", "project:member"];
+const SCOPES = [
+  "openid",
+  "email",
+  "profile",
+  "offline_access",
+  "project:member",
+  "workspace:admin",
+];
 
 /** Short-lived cookies holding the in-flight sign-in attempt. */
 const STATE_COOKIE = "railway_oauth_state";
