@@ -31,6 +31,14 @@ describe("MockStore", () => {
     expect(seedWorld({ now })).toEqual(seedWorld({ now }));
   });
 
+  it("seeds datastores with a volume for their data", () => {
+    const world = seedWorld();
+    const postgres = world.services.find((s) => s.name === "postgres");
+    expect(world.volumes).toContainEqual(
+      expect.objectContaining({ serviceId: postgres?.id, mountPath: "/var/lib/postgresql/data" }),
+    );
+  });
+
   it("replaces the running deployment once a new one is up", () => {
     const store = new MockStore(seedWorld());
     const target = find(store, "billing", "api");

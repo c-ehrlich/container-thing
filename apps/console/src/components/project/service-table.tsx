@@ -1,6 +1,7 @@
 import { cn } from "@repo/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@repo/ui/primitives/tooltip";
 import { Link } from "@tanstack/react-router";
-import { ChevronRightIcon, DatabaseIcon } from "lucide-react";
+import { ChevronRightIcon, DatabaseIcon, HardDriveIcon } from "lucide-react";
 
 import { KIND_ORDER, ago, isDatastore, servicesOf } from "../../domains/insights/health";
 import type { ServiceWithState } from "../../domains/insights/health";
@@ -93,14 +94,29 @@ function ServiceRow(props: {
           <DatabaseIcon className="size-3.5 shrink-0 text-muted-foreground" />
         )}
         <div className="grid min-w-0">
-          <Link
-            to="/projects/$projectId/services/$serviceId"
-            params={{ projectId: project.id, serviceId: service.id }}
-            search={{ environmentId: service.environment.id }}
-            className="truncate font-medium outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
-          >
-            {service.name}
-          </Link>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Link
+              to="/projects/$projectId/services/$serviceId"
+              params={{ projectId: project.id, serviceId: service.id }}
+              search={{ environmentId: service.environment.id }}
+              className="truncate font-medium outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+            >
+              {service.name}
+            </Link>
+            {service.volumeMountPath && (
+              // Above the row's link, so the tooltip opens on hover.
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <HardDriveIcon className="relative z-10 size-3.5 shrink-0 text-muted-foreground" />
+                  }
+                />
+                <TooltipContent>
+                  Volume at <span className="font-mono">{service.volumeMountPath}</span>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
           {service.source && (
             <span className="truncate text-xs text-muted-foreground">{service.source}</span>
           )}
