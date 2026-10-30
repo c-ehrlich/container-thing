@@ -29,11 +29,13 @@ export function ActionButton(props: {
   icon?: React.ReactNode;
   title?: string;
   variant?: "default" | "outline" | "ghost";
+  /** Runs once the action succeeded and the project was refetched. */
+  onSuccess?: () => void;
 }) {
   const { pending, confirm } = describeAction(props.action);
   const [open, setOpen] = useState(false);
   const mutation = useRailwayAction(props.projectId);
-  const run = () => mutation.mutate(props.action);
+  const run = () => mutation.mutate(props.action, { onSuccess: props.onSuccess });
 
   const button = {
     size: "sm",

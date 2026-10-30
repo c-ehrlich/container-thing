@@ -1,4 +1,5 @@
 import { SidebarInset, SidebarProvider } from "@repo/ui/primitives/sidebar";
+import { Toaster } from "@repo/ui/primitives/toast";
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
@@ -74,18 +75,20 @@ function RootLayout() {
   if (!viewer) return <SignInScreen />;
 
   return (
-    <SidebarProvider defaultOpen={sidebarOpen}>
-      <AppSidebar viewer={viewer} backend={backend} />
-      <SidebarInset className="min-w-0">
-        <AppHeader
-          viewer={viewer}
-          backend={backend}
-          chatOpen={chatOpen}
-          onOpenChat={() => setChatOpen(true)}
-        />
-        <Outlet />
-      </SidebarInset>
-      <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
-    </SidebarProvider>
+    <Toaster>
+      <SidebarProvider defaultOpen={sidebarOpen}>
+        <AppSidebar viewer={viewer} backend={backend} />
+        <SidebarInset className="min-w-0">
+          <AppHeader
+            viewer={viewer}
+            backend={backend}
+            chatOpen={chatOpen}
+            onOpenChat={() => setChatOpen(true)}
+          />
+          <Outlet />
+        </SidebarInset>
+        <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+      </SidebarProvider>
+    </Toaster>
   );
 }
